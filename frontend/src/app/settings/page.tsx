@@ -7,14 +7,17 @@ import { useAuth } from '@/app/providers';
 import { fetchPreferences, savePreferences } from '@/lib/api';
 import { SPORT_LABELS, SPORT_COLORS, type SportCategory } from '@/types/events';
 
-const ALL_SPORTS: SportCategory[] = ['f1', 'ajax', 'mvdp_road', 'mvdp_cx', 'mvdp_mtb'];
+const ALL_SPORTS: SportCategory[] = ['f1', 'ajax', 'az', 'mvdp_road', 'mvdp_cx', 'mvdp_mtb', 'pp_road', 'pp_cx'];
 
 const SPORT_ICONS: Record<SportCategory, string> = {
   f1: '🏎️',
   ajax: '⚽',
+  az: '⚽',
   mvdp_road: '🚴',
   mvdp_cx: '🚵',
   mvdp_mtb: '⛰️',
+  pp_road: '🚴',
+  pp_cx: '🚵',
 };
 
 export default function SettingsPage() {

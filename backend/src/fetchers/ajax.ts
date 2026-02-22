@@ -1,5 +1,5 @@
 import axios from 'axios';
-import type { SportEvent } from '../types/events';
+import type { SportEvent, SportCategory } from '../types/events';
 
 interface FDMatch {
   id: number;
@@ -15,13 +15,13 @@ interface FDResponse {
   matches: FDMatch[];
 }
 
-const AJAX_TEAM_ID = 678;
 const BASE_URL = 'https://api.football-data.org/v4';
+const FINISHED = new Set(['FINISHED', 'CANCELLED', 'POSTPONED', 'SUSPENDED', 'AWARDED']);
 
-export async function fetchAjaxEvents(): Promise<SportEvent[]> {
+async function fetchTeamEvents(teamId: number, sport: SportCategory): Promise<SportEvent[]> {
   const apiKey = (process.env.FOOTBALL_DATA_API_KEY ?? '').trim();
   if (!apiKey) {
-    console.warn('[Ajax] FOOTBALL_DATA_API_KEY not set — skipping Ajax events');
+    console.warn(`[Football/${sport}] FOOTBALL_DATA_API_KEY not set — skipping`);
     return [];
   }
 
@@ -29,9 +29,8 @@ export async function fetchAjaxEvents(): Promise<SportEvent[]> {
   const future = new Date(now.getTime() + 180 * 24 * 60 * 60 * 1000); // 6 months ahead
 
   try {
-    // football-data.org v4: use dateFrom/dateTo instead of status filter
     const { data } = await axios.get<FDResponse>(
-      `${BASE_URL}/teams/${AJAX_TEAM_ID}/matches`,
+      `${BASE_URL}/teams/${teamId}/matches`,
       {
         headers: { 'X-Auth-Token': apiKey },
         params: {
@@ -43,26 +42,31 @@ export async function fetchAjaxEvents(): Promise<SportEvent[]> {
       }
     );
 
-    // Only show unplayed matches
-    const upcoming = data.matches.filter(
-      (m) => !['FINISHED', 'CANCELLED', 'POSTPONED', 'SUSPENDED', 'AWARDED'].includes(m.status)
-    );
+    const events: SportEvent[] = data.matches
+      .filter((m) => !FINISHED.has(m.status))
+      .map((match) => ({
+        id: `${sport}_${match.id}`,
+        sport,
+        title: `${match.homeTeam.name} vs ${match.awayTeam.name}`,
+        competition: match.competition.name,
+        startTime: match.utcDate,
+        location: match.venue,
+        fetchedAt: new Date().toISOString(),
+        sourceUrl: 'https://www.football-data.org',
+      }));
 
-    const events: SportEvent[] = upcoming.map((match) => ({
-      id: `ajax_${match.id}`,
-      sport: 'ajax',
-      title: `${match.homeTeam.name} vs ${match.awayTeam.name}`,
-      competition: match.competition.name,
-      startTime: match.utcDate,
-      location: match.venue,
-      fetchedAt: new Date().toISOString(),
-      sourceUrl: 'https://www.ajax.nl/en/matches',
-    }));
-
-    console.log(`[Ajax] Fetched ${events.length} upcoming matches`);
+    console.log(`[Football/${sport}] Fetched ${events.length} upcoming matches`);
     return events;
   } catch (err) {
-    console.error('[Ajax] Failed to fetch matches:', err);
+    console.error(`[Football/${sport}] Failed to fetch matches:`, err);
     return [];
   }
+}
+
+export function fetchAjaxEvents(): Promise<SportEvent[]> {
+  return fetchTeamEvents(678, 'ajax');
+}
+
+export function fetchAZEvents(): Promise<SportEvent[]> {
+  return fetchTeamEvents(682, 'az');
 }

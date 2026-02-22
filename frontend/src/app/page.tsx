@@ -11,7 +11,7 @@ import DaySection from '@/components/DaySection';
 import type { SportEvent, UserPreferences } from '@/types/events';
 
 const DEFAULT_PREFS: UserPreferences = {
-  sports: ['f1', 'ajax', 'mvdp_road', 'mvdp_cx', 'mvdp_mtb'],
+  sports: ['f1', 'ajax', 'az', 'mvdp_road', 'mvdp_cx', 'mvdp_mtb', 'pp_road', 'pp_cx'],
   timezone: 'Europe/Amsterdam',
 };
 

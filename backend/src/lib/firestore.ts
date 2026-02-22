@@ -59,14 +59,32 @@ export async function setUserPreferences(uid: string, prefs: UserPreferences): P
   await db.collection('users').doc(uid).collection('preferences').doc('main').set(prefs);
 }
 
-// Deletes cycling events with invalid race names (e.g. pure numbers like "1", "140")
-// that were stored by earlier scraper versions without proper filtering.
+/**
+ * Returns true when a cycling event competition field is invalid.
+ * Catches artifacts from multiple scraper generations:
+ *   - no letters (pure numeric like "1", "140")
+ *   - starts with "(" → classification codes like "(1.UWT)"
+ *   - starts with "- " → broken span removal artifact like "- Lido di Camaiore"
+ *   - too short (< 6 chars)
+ *   - old concatenated stage names like "S1 (ITT)Stage 1 (ITT) - ..."
+ */
+function isInvalidCompetition(comp: string): boolean {
+  if (!comp || comp.length < 6) return true;
+  if (!/[a-zA-Z]/.test(comp)) return true;
+  if (comp.startsWith('(')) return true;
+  if (comp.startsWith('- ')) return true;
+  // Old concatenated stage names: uppercase letter + digit immediately followed by " (" or a letter
+  if (/^[A-Z]\d+[\s(][A-Z(]/.test(comp)) return true;
+  return false;
+}
+
+// Deletes cycling events with invalid competition names stored by earlier scraper versions.
 export async function purgeInvalidCyclingEvents(): Promise<number> {
-  const sports = ['mvdp_road', 'mvdp_cx', 'mvdp_mtb'];
+  const sports = ['mvdp_road', 'mvdp_cx', 'mvdp_mtb', 'pp_road', 'pp_cx'];
   let deleted = 0;
   for (const sport of sports) {
     const snapshot = await db.collection('events').where('sport', '==', sport).get();
-    const invalid = snapshot.docs.filter((doc) => !/[a-zA-Z]/.test(doc.data().competition ?? ''));
+    const invalid = snapshot.docs.filter((doc) => isInvalidCompetition(doc.data().competition ?? ''));
     if (invalid.length === 0) continue;
     const batch = db.batch();
     invalid.forEach((doc) => batch.delete(doc.ref));

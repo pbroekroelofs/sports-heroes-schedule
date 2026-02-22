@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { fetchF1Events } from '../fetchers/f1';
-import { fetchAjaxEvents } from '../fetchers/ajax';
-import { fetchCyclingEvents } from '../fetchers/cycling';
+import { fetchAjaxEvents, fetchAZEvents } from '../fetchers/ajax';
+import { fetchCyclingEvents, fetchPuckPieterseEvents } from '../fetchers/cycling';
 import { upsertEvent, purgeInvalidCyclingEvents } from '../lib/firestore';
 
 const router = Router();
@@ -22,19 +22,23 @@ router.post('/refresh', async (req, res) => {
 
   console.log('[Cron] Starting daily data refresh...');
 
-  const [f1Result, ajaxResult, cyclingResult] = await Promise.allSettled([
+  const [f1Result, ajaxResult, azResult, mvdpResult, ppResult] = await Promise.allSettled([
     fetchF1Events(),
     fetchAjaxEvents(),
+    fetchAZEvents(),
     fetchCyclingEvents(),
+    fetchPuckPieterseEvents(),
   ]);
 
   const allEvents = [
     ...(f1Result.status === 'fulfilled' ? f1Result.value : []),
     ...(ajaxResult.status === 'fulfilled' ? ajaxResult.value : []),
-    ...(cyclingResult.status === 'fulfilled' ? cyclingResult.value : []),
+    ...(azResult.status === 'fulfilled' ? azResult.value : []),
+    ...(mvdpResult.status === 'fulfilled' ? mvdpResult.value : []),
+    ...(ppResult.status === 'fulfilled' ? ppResult.value : []),
   ];
 
-  // Upsert in parallel — Firestore handles concurrency fine at this scale
+  // Upsert in parallel
   const upsertResults = await Promise.allSettled(allEvents.map((e) => upsertEvent(e)));
   const failedUpserts = upsertResults.filter((r) => r.status === 'rejected');
   if (failedUpserts.length > 0) {
@@ -42,15 +46,18 @@ router.post('/refresh', async (req, res) => {
       failedUpserts.map((r) => (r as PromiseRejectedResult).reason));
   }
 
+  // Purge old invalid cycling entries from Firestore
+  const purged = await purgeInvalidCyclingEvents();
+  if (purged > 0) console.log(`[Cron] Purged ${purged} invalid cycling events from Firestore`);
+
   const summary = {
     f1: f1Result.status === 'fulfilled' ? f1Result.value.length : `ERROR: ${(f1Result as PromiseRejectedResult).reason}`,
     ajax: ajaxResult.status === 'fulfilled' ? ajaxResult.value.length : `ERROR: ${(ajaxResult as PromiseRejectedResult).reason}`,
-    cycling: cyclingResult.status === 'fulfilled' ? cyclingResult.value.length : `ERROR: ${(cyclingResult as PromiseRejectedResult).reason}`,
+    az: azResult.status === 'fulfilled' ? azResult.value.length : `ERROR: ${(azResult as PromiseRejectedResult).reason}`,
+    mvdp: mvdpResult.status === 'fulfilled' ? mvdpResult.value.length : `ERROR: ${(mvdpResult as PromiseRejectedResult).reason}`,
+    pp: ppResult.status === 'fulfilled' ? ppResult.value.length : `ERROR: ${(ppResult as PromiseRejectedResult).reason}`,
     total: allEvents.length,
   };
-
-  const purged = await purgeInvalidCyclingEvents();
-  if (purged > 0) console.log(`[Cron] Purged ${purged} invalid cycling events from Firestore`);
 
   console.log('[Cron] Refresh complete:', summary);
   res.json({ ok: true, summary, purged });

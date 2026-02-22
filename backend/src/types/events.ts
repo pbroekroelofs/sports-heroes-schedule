@@ -1,16 +1,22 @@
 export type SportCategory =
   | 'f1'
   | 'ajax'
+  | 'az'
   | 'mvdp_road'
   | 'mvdp_cx'
-  | 'mvdp_mtb';
+  | 'mvdp_mtb'
+  | 'pp_road'
+  | 'pp_cx';
 
 export const SPORT_LABELS: Record<SportCategory, string> = {
   f1: 'Formula 1',
   ajax: 'Ajax',
+  az: 'AZ',
   mvdp_road: 'MvdP – Road',
-  mvdp_cx: 'MvdP – Cyclocross',
+  mvdp_cx: 'MvdP – CX',
   mvdp_mtb: 'MvdP – MTB',
+  pp_road: 'PP – Road',
+  pp_cx: 'PP – CX',
 };
 
 export interface SportEvent {
