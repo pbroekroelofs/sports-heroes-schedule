@@ -33,15 +33,26 @@ function parsePCSDate(dateText: string): Date | null {
   const month = parseInt(match[2], 10) - 1;
   const now = new Date();
   let year = match[3] ? parseInt(match[3], 10) : now.getFullYear();
-  let date = new Date(Date.UTC(year, month, day, 10, 0, 0));
+  const date = new Date(Date.UTC(year, month, day, 10, 0, 0));
   if (!match[3] && date < new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)) {
-    date = new Date(Date.UTC(year + 1, month, day, 10, 0, 0));
+    return new Date(Date.UTC(year + 1, month, day, 10, 0, 0));
   }
   return date;
 }
 
-function isNumeric(s: string): boolean {
-  return /^\d+$/.test(s.trim());
+// Race name must contain at least one letter — filters out numeric rankings and position numbers
+function hasValidRaceName(s: string): boolean {
+  return /[a-zA-Z]/.test(s) && s.length > 2;
+}
+
+// PCS uses <span class="rdrAbr"> for stage abbreviations (e.g. "S1 (ITT)").
+// Without removing them, .text() returns "S1 (ITT)Stage 1 (ITT) - ..." (concatenated).
+function getLinkText($: ReturnType<typeof cheerio.load>, el: cheerio.Element): string {
+  const link = $(el).find('a').first();
+  const clone = link.clone();
+  clone.find('span').remove();
+  const cleaned = clone.text().trim();
+  return cleaned || link.text().trim();
 }
 
 async function fetchHtml(): Promise<string> {
@@ -83,9 +94,9 @@ export async function fetchCyclingEvents(): Promise<SportEvent[]> {
     // Strategy 1: PCS upcoming section
     for (const el of $('ul.rdrSeasonList li, .rdrUpcoming li').toArray()) {
       const dateText = $(el).find('.date').first().text().trim();
-      const raceName = $(el).find('a').first().text().trim();
+      const raceName = getLinkText($, el);
       const raceUrl = $(el).find('a').first().attr('href');
-      if (!dateText || !raceName || isNumeric(raceName)) continue;
+      if (!dateText || !hasValidRaceName(raceName)) continue;
       const date = parsePCSDate(dateText);
       if (!date || date < now) continue;
       const key = `${dateText}_${raceName}`;
@@ -108,14 +119,15 @@ export async function fetchCyclingEvents(): Promise<SportEvent[]> {
           let raceName = '';
           let raceUrl = '';
           for (let i = 1; i < Math.min(cells.length, 5); i++) {
-            const candidate = $(cells[i]).find('a').first().text().trim();
-            if (candidate && !isNumeric(candidate) && candidate.length > 3) {
+            const cellEl = cells[i] as cheerio.Element;
+            const candidate = getLinkText($, cellEl);
+            if (hasValidRaceName(candidate)) {
               raceName = candidate;
               raceUrl = $(cells[i]).find('a').first().attr('href') || '';
               break;
             }
           }
-          if (!raceName || isNumeric(raceName)) continue;
+          if (!hasValidRaceName(raceName)) continue;
           const date = parsePCSDate(dateText);
           if (!date || date < now) continue;
           const key = `${dateText}_${raceName}`;

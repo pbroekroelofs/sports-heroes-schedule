@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { fetchF1Events } from '../fetchers/f1';
 import { fetchAjaxEvents } from '../fetchers/ajax';
 import { fetchCyclingEvents } from '../fetchers/cycling';
-import { upsertEvent } from '../lib/firestore';
+import { upsertEvent, purgeInvalidCyclingEvents } from '../lib/firestore';
 
 const router = Router();
 
@@ -49,8 +49,11 @@ router.post('/refresh', async (req, res) => {
     total: allEvents.length,
   };
 
+  const purged = await purgeInvalidCyclingEvents();
+  if (purged > 0) console.log(`[Cron] Purged ${purged} invalid cycling events from Firestore`);
+
   console.log('[Cron] Refresh complete:', summary);
-  res.json({ ok: true, summary });
+  res.json({ ok: true, summary, purged });
 });
 
 export default router;

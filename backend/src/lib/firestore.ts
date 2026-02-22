@@ -58,3 +58,20 @@ export async function getUserPreferences(uid: string): Promise<UserPreferences |
 export async function setUserPreferences(uid: string, prefs: UserPreferences): Promise<void> {
   await db.collection('users').doc(uid).collection('preferences').doc('main').set(prefs);
 }
+
+// Deletes cycling events with invalid race names (e.g. pure numbers like "1", "140")
+// that were stored by earlier scraper versions without proper filtering.
+export async function purgeInvalidCyclingEvents(): Promise<number> {
+  const sports = ['mvdp_road', 'mvdp_cx', 'mvdp_mtb'];
+  let deleted = 0;
+  for (const sport of sports) {
+    const snapshot = await db.collection('events').where('sport', '==', sport).get();
+    const invalid = snapshot.docs.filter((doc) => !/[a-zA-Z]/.test(doc.data().competition ?? ''));
+    if (invalid.length === 0) continue;
+    const batch = db.batch();
+    invalid.forEach((doc) => batch.delete(doc.ref));
+    await batch.commit();
+    deleted += invalid.length;
+  }
+  return deleted;
+}
