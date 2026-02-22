@@ -13,8 +13,9 @@ const router = Router();
  * and configure Cloud Scheduler to send it as the X-Cron-Secret header.
  */
 router.post('/refresh', async (req, res) => {
-  const cronSecret = req.headers['x-cron-secret'];
-  if (process.env.NODE_ENV === 'production' && cronSecret !== process.env.CRON_SECRET) {
+  const cronSecret = ((req.headers['x-cron-secret'] as string) ?? '').trim();
+  const expectedSecret = (process.env.CRON_SECRET ?? '').trim();
+  if (process.env.NODE_ENV === 'production' && cronSecret !== expectedSecret) {
     res.status(401).json({ error: 'Unauthorized' });
     return;
   }
