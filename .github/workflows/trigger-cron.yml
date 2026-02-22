@@ -1,0 +1,31 @@
+name: Trigger cron refresh
+
+on:
+  workflow_dispatch: # Manual trigger from GitHub Actions UI
+
+jobs:
+  refresh:
+    name: Refresh sports data
+    runs-on: ubuntu-latest
+    steps:
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Get backend URL and cron secret, then trigger refresh
+        run: |
+          URL=$(gcloud run services describe sports-schedule-backend \
+            --region=europe-west4 \
+            --project=${{ secrets.GCP_PROJECT_ID }} \
+            --format='value(status.url)')
+          SECRET=$(gcloud secrets versions access latest \
+            --secret=cron-secret \
+            --project=${{ secrets.GCP_PROJECT_ID }})
+          echo "Triggering cron on $URL"
+          curl -s -X POST "$URL/cron/refresh" \
+            -H "X-Cron-Secret: $SECRET" \
+            -H "Content-Type: application/json"
