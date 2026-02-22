@@ -36,10 +36,10 @@ export default function EventCard({ event, timezone }: Props) {
 
       {/* Content */}
       <div className="flex-1 min-w-0">
-        <p className="text-white font-semibold leading-snug truncate">{event.title}</p>
-        <p className="text-slate-400 text-sm mt-0.5 truncate">{event.competition}</p>
+        <p className="text-white font-semibold leading-snug">{event.title}</p>
+        <p className="text-slate-400 text-sm mt-0.5">{event.competition}</p>
         {event.location && (
-          <p className="text-slate-500 text-xs mt-1 truncate">📍 {event.location}</p>
+          <p className="text-slate-500 text-xs mt-1">📍 {event.location}</p>
         )}
       </div>
 
