@@ -42,8 +42,8 @@ jobs:
             --platform managed \
             --allow-unauthenticated \
             --service-account sports-schedule-backend@$GCP_PROJECT.iam.gserviceaccount.com \
-            --set-env-vars "NODE_ENV=production,FRONTEND_URL=${{ secrets.FRONTEND_URL }},ZENROWS_API_KEY=${{ secrets.ZENROWS_API_KEY }}" \
-            --set-secrets "FIREBASE_SERVICE_ACCOUNT=firebase-service-account:latest,CRON_SECRET=cron-secret:latest,FOOTBALL_DATA_API_KEY=football-data-api-key:latest"
+            --set-env-vars "NODE_ENV=production,FRONTEND_URL=${{ secrets.FRONTEND_URL }},ZENROWS_API_KEY=${{ secrets.ZENROWS_API_KEY }},CRON_SECRET=${{ secrets.CRON_SECRET }}" \
+            --set-secrets "FIREBASE_SERVICE_ACCOUNT=firebase-service-account:latest,FOOTBALL_DATA_API_KEY=football-data-api-key:latest"
 
   deploy-frontend:
     name: Deploy Frontend

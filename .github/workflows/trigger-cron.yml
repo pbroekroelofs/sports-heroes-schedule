@@ -16,16 +16,13 @@ jobs:
       - name: Set up Cloud SDK
         uses: google-github-actions/setup-gcloud@v2
 
-      - name: Get backend URL and cron secret, then trigger refresh
+      - name: Get backend URL and trigger refresh
         run: |
           URL=$(gcloud run services describe sports-schedule-backend \
             --region=europe-west4 \
             --project=${{ secrets.GCP_PROJECT_ID }} \
             --format='value(status.url)')
-          SECRET=$(gcloud secrets versions access latest \
-            --secret=cron-secret \
-            --project=${{ secrets.GCP_PROJECT_ID }})
           echo "Triggering cron on $URL"
           curl -s -X POST "$URL/cron/refresh" \
-            -H "X-Cron-Secret: $SECRET" \
+            -H "X-Cron-Secret: ${{ secrets.CRON_SECRET }}" \
             -H "Content-Type: application/json"
