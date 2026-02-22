@@ -78,6 +78,15 @@ function isInvalidCompetition(comp: string): boolean {
   return false;
 }
 
+// Deletes ALL events for the given sport categories (used for full cycling refresh).
+export async function deleteEventsForSports(sports: string[]): Promise<void> {
+  const snapshot = await db.collection('events').where('sport', 'in', sports).get();
+  if (snapshot.empty) return;
+  const batch = db.batch();
+  snapshot.docs.forEach((doc) => batch.delete(doc.ref));
+  await batch.commit();
+}
+
 // Deletes cycling events with invalid competition names stored by earlier scraper versions.
 export async function purgeInvalidCyclingEvents(): Promise<number> {
   const sports = ['mvdp_road', 'mvdp_cx', 'mvdp_mtb', 'pp_road', 'pp_cx'];

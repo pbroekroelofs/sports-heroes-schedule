@@ -37,7 +37,8 @@ export default function EventCard({ event, timezone }: Props) {
       {/* Content */}
       <div className="flex-1 min-w-0">
         <p className="text-white font-semibold leading-snug">{event.title}</p>
-        {event.competition !== SPORT_LABELS[event.sport] && (
+        {event.competition !== SPORT_LABELS[event.sport] &&
+          !event.title.startsWith(event.competition) && (
           <p className="text-slate-400 text-sm mt-0.5">{event.competition}</p>
         )}
         {event.location && (

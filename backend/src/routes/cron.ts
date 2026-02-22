@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { fetchF1Events } from '../fetchers/f1';
 import { fetchAjaxEvents, fetchAZEvents } from '../fetchers/ajax';
 import { fetchCyclingEvents, fetchPuckPieterseEvents } from '../fetchers/cycling';
-import { upsertEvent, purgeInvalidCyclingEvents } from '../lib/firestore';
+import { upsertEvent, deleteEventsForSports, purgeInvalidCyclingEvents } from '../lib/firestore';
 
 const router = Router();
 
@@ -37,6 +37,15 @@ router.post('/refresh', async (req, res) => {
     ...(mvdpResult.status === 'fulfilled' ? mvdpResult.value : []),
     ...(ppResult.status === 'fulfilled' ? ppResult.value : []),
   ];
+
+  // Full replace for cycling: delete stale entries before inserting fresh ones.
+  // Only delete when the fetch succeeded with results, to avoid wiping data on failures.
+  if (mvdpResult.status === 'fulfilled' && mvdpResult.value.length > 0) {
+    await deleteEventsForSports(['mvdp_road', 'mvdp_cx', 'mvdp_mtb']);
+  }
+  if (ppResult.status === 'fulfilled' && ppResult.value.length > 0) {
+    await deleteEventsForSports(['pp_road', 'pp_cx']);
+  }
 
   // Upsert in parallel
   const upsertResults = await Promise.allSettled(allEvents.map((e) => upsertEvent(e)));
