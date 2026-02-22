@@ -1,7 +1,7 @@
 import { auth } from './firebase';
 import type { SportEvent, UserPreferences } from '@/types/events';
 
-const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL ?? 'http://localhost:8080';
+const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8080';
 
 async function authFetch(path: string, init?: RequestInit): Promise<Response> {
   const user = auth.currentUser;
