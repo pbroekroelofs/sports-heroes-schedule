@@ -47,7 +47,8 @@ function hasValidRaceName(s: string): boolean {
 
 // PCS uses <span class="rdrAbr"> for stage abbreviations (e.g. "S1 (ITT)").
 // Without removing them, .text() returns "S1 (ITT)Stage 1 (ITT) - ..." (concatenated).
-function getLinkText($: ReturnType<typeof cheerio.load>, el: cheerio.Element): string {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function getLinkText($: ReturnType<typeof cheerio.load>, el: any): string {
   const link = $(el).find('a').first();
   const clone = link.clone();
   clone.find('span').remove();
@@ -119,8 +120,7 @@ export async function fetchCyclingEvents(): Promise<SportEvent[]> {
           let raceName = '';
           let raceUrl = '';
           for (let i = 1; i < Math.min(cells.length, 5); i++) {
-            const cellEl = cells[i] as cheerio.Element;
-            const candidate = getLinkText($, cellEl);
+            const candidate = getLinkText($, cells[i]);
             if (hasValidRaceName(candidate)) {
               raceName = candidate;
               raceUrl = $(cells[i]).find('a').first().attr('href') || '';
