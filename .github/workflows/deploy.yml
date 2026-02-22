@@ -34,6 +34,12 @@ jobs:
           push: true
           tags: europe-west4-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/sports-schedule/backend:${{ github.sha }}
 
+      - name: Remove CRON_SECRET secret binding (one-time migration)
+        run: |
+          gcloud run services update sports-schedule-backend \
+            --region $GCP_REGION \
+            --remove-secrets CRON_SECRET 2>/dev/null || true
+
       - name: Deploy backend to Cloud Run
         run: |
           gcloud run deploy sports-schedule-backend \
@@ -42,9 +48,14 @@ jobs:
             --platform managed \
             --allow-unauthenticated \
             --service-account sports-schedule-backend@$GCP_PROJECT.iam.gserviceaccount.com \
-            --remove-secrets "CRON_SECRET" \
             --set-env-vars "NODE_ENV=production,FRONTEND_URL=${{ secrets.FRONTEND_URL }},ZENROWS_API_KEY=${{ secrets.ZENROWS_API_KEY }},CRON_SECRET=${{ secrets.CRON_SECRET }}" \
             --set-secrets "FIREBASE_SERVICE_ACCOUNT=firebase-service-account:latest,FOOTBALL_DATA_API_KEY=football-data-api-key:latest"
+
+      - name: Update Cloud Scheduler with new cron secret
+        run: |
+          gcloud scheduler jobs update http daily-refresh \
+            --location europe-west1 \
+            --update-headers "X-Cron-Secret=${{ secrets.CRON_SECRET }}" 2>/dev/null || true
 
   deploy-frontend:
     name: Deploy Frontend

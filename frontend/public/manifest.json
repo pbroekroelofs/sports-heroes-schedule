@@ -1,6 +1,6 @@
 {
-  "name": "Sports Schedule",
-  "short_name": "Schedule",
+  "name": "Sports Heroes Schedule",
+  "short_name": "Heroes",
   "description": "Your personal sports event schedule — F1, Ajax, MvdP and more",
   "start_url": "/",
   "display": "standalone",

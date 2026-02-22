@@ -8,7 +8,7 @@ import InstallPrompt from '@/components/InstallPrompt';
 const inter = Inter({ subsets: ['latin'] });
 
 export const metadata: Metadata = {
-  title: 'Sports Schedule',
+  title: 'Sports Heroes Schedule',
   description: 'Your personal sports event schedule — F1, Ajax, MvdP and more',
   manifest: '/manifest.json',
   appleWebApp: {
