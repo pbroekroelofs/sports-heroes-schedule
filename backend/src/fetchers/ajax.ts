@@ -20,7 +20,7 @@ const AJAX_TEAM_ID = 678;
 const BASE_URL = 'https://api.football-data.org/v4';
 
 export async function fetchAjaxEvents(): Promise<SportEvent[]> {
-  const apiKey = process.env.FOOTBALL_DATA_API_KEY;
+  const apiKey = (process.env.FOOTBALL_DATA_API_KEY ?? '').trim();
   if (!apiKey) {
     console.warn('[Ajax] FOOTBALL_DATA_API_KEY not set — skipping Ajax events');
     return [];
