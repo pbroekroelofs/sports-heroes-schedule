@@ -35,7 +35,12 @@ router.post('/refresh', async (req, res) => {
   ];
 
   // Upsert in parallel — Firestore handles concurrency fine at this scale
-  await Promise.allSettled(allEvents.map((e) => upsertEvent(e)));
+  const upsertResults = await Promise.allSettled(allEvents.map((e) => upsertEvent(e)));
+  const failedUpserts = upsertResults.filter((r) => r.status === 'rejected');
+  if (failedUpserts.length > 0) {
+    console.error(`[Cron] ${failedUpserts.length} upserts failed:`,
+      failedUpserts.map((r) => (r as PromiseRejectedResult).reason));
+  }
 
   const summary = {
     f1: f1Result.status === 'fulfilled' ? f1Result.value.length : `ERROR: ${(f1Result as PromiseRejectedResult).reason}`,

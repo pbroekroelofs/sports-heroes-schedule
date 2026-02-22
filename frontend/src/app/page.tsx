@@ -43,7 +43,7 @@ export default function SchedulePage() {
   const { data: events, error, isLoading } = useSWR<SportEvent[]>(
     user ? 'events' : null,
     () => fetchEvents(),
-    { revalidateOnFocus: false }
+    { revalidateOnFocus: true, revalidateOnReconnect: true }
   );
 
   const filtered = useMemo(() => {
