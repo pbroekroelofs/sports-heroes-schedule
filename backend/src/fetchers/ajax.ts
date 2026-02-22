@@ -15,7 +15,6 @@ interface FDResponse {
   matches: FDMatch[];
 }
 
-// Ajax Amsterdam team ID on football-data.org
 const AJAX_TEAM_ID = 678;
 const BASE_URL = 'https://api.football-data.org/v4';
 
@@ -26,20 +25,30 @@ export async function fetchAjaxEvents(): Promise<SportEvent[]> {
     return [];
   }
 
+  const now = new Date();
+  const future = new Date(now.getTime() + 180 * 24 * 60 * 60 * 1000); // 6 months ahead
+
   try {
+    // football-data.org v4: use dateFrom/dateTo instead of status filter
     const { data } = await axios.get<FDResponse>(
       `${BASE_URL}/teams/${AJAX_TEAM_ID}/matches`,
       {
         headers: { 'X-Auth-Token': apiKey },
         params: {
-          status: 'SCHEDULED',
+          dateFrom: now.toISOString().slice(0, 10),
+          dateTo: future.toISOString().slice(0, 10),
           limit: 30,
         },
         timeout: 10_000,
       }
     );
 
-    const events: SportEvent[] = data.matches.map((match) => ({
+    // Only show unplayed matches
+    const upcoming = data.matches.filter(
+      (m) => !['FINISHED', 'CANCELLED', 'POSTPONED', 'SUSPENDED', 'AWARDED'].includes(m.status)
+    );
+
+    const events: SportEvent[] = upcoming.map((match) => ({
       id: `ajax_${match.id}`,
       sport: 'ajax',
       title: `${match.homeTeam.name} vs ${match.awayTeam.name}`,
@@ -50,7 +59,7 @@ export async function fetchAjaxEvents(): Promise<SportEvent[]> {
       sourceUrl: 'https://www.ajax.nl/en/matches',
     }));
 
-    console.log(`[Ajax] Fetched ${events.length} matches`);
+    console.log(`[Ajax] Fetched ${events.length} upcoming matches`);
     return events;
   } catch (err) {
     console.error('[Ajax] Failed to fetch matches:', err);

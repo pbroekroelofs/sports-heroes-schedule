@@ -7,18 +7,22 @@ interface OpenF1Session {
   session_type: string;
   date_start: string;
   date_end: string;
-  gp_name: string;
+  meeting_name?: string;
+  gp_name?: string;
   location: string;
   country_name: string;
+  circuit_short_name?: string;
   year: number;
 }
 
-// Show Race, Qualifying, and Sprint — skip practice sessions
 const RELEVANT_TYPES = new Set(['Race', 'Qualifying', 'Sprint', 'Sprint Qualifying', 'Sprint Shootout']);
+
+function getGpName(session: OpenF1Session): string {
+  return session.meeting_name || session.gp_name || `${session.country_name} Grand Prix`;
+}
 
 export async function fetchF1Events(): Promise<SportEvent[]> {
   const currentYear = new Date().getFullYear();
-  // Fetch current and next year so the schedule is never empty near year-end
   const years = [currentYear, currentYear + 1];
   const events: SportEvent[] = [];
 
@@ -32,10 +36,11 @@ export async function fetchF1Events(): Promise<SportEvent[]> {
       const relevant = data.filter((s) => RELEVANT_TYPES.has(s.session_type));
 
       for (const session of relevant) {
+        const gpName = getGpName(session);
         events.push({
           id: `f1_${session.session_key}`,
           sport: 'f1',
-          title: `${session.gp_name} – ${session.session_name}`,
+          title: `${gpName} \u2013 ${session.session_name}`,
           competition: 'Formula 1',
           startTime: session.date_start,
           endTime: session.date_end,
