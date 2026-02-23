@@ -8,7 +8,9 @@ function initFirebase() {
     if (!serviceAccount) throw new Error('FIREBASE_SERVICE_ACCOUNT env var is not set');
     initializeApp({ credential: cert(JSON.parse(serviceAccount)) });
   }
-  return getFirestore();
+  const db = getFirestore();
+  db.settings({ ignoreUndefinedProperties: true });
+  return db;
 }
 
 export const db = initFirebase();
