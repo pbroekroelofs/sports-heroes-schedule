@@ -65,8 +65,8 @@ export default function SchedulePage() {
   if (error) {
     return (
       <div className="flex flex-col items-center justify-center h-64 text-slate-400">
-        <p className="text-lg mb-2">Failed to load events</p>
-        <p className="text-sm">Check your connection and try again</p>
+        <p className="text-lg mb-2">Laden mislukt</p>
+        <p className="text-sm">Controleer je verbinding en probeer opnieuw</p>
       </div>
     );
   }
@@ -75,11 +75,11 @@ export default function SchedulePage() {
     return (
       <div className="flex flex-col items-center justify-center h-64 text-slate-400 px-6 text-center">
         <p className="text-4xl mb-4">📭</p>
-        <p className="text-lg font-semibold mb-2">No upcoming events</p>
+        <p className="text-lg font-semibold mb-2">Geen aankomende wedstrijden</p>
         <p className="text-sm">
-          Check your sport selections in{' '}
+          Controleer je selectie in{' '}
           <button onClick={() => router.push('/settings')} className="text-sky-400 underline">
-            Settings
+            Instellingen
           </button>
         </p>
       </div>

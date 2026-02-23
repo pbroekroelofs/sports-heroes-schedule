@@ -20,13 +20,13 @@ export default function NavBar() {
             href="/settings"
             className={`text-sm ${pathname === '/settings' ? 'text-white font-semibold' : 'text-slate-400 hover:text-white'}`}
           >
-            Settings
+            Instellingen
           </Link>
           <button
             onClick={() => logout()}
             className="text-sm text-slate-400 hover:text-white transition-colors"
           >
-            Sign out
+            Uitloggen
           </button>
         </nav>
       )}

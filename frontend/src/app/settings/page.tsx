@@ -71,8 +71,8 @@ export default function SettingsPage() {
 
   return (
     <div className="px-4 py-6 max-w-xl mx-auto">
-      <h1 className="text-2xl font-bold text-white mb-1">Settings</h1>
-      <p className="text-slate-400 text-sm mb-6">Choose which sports appear in your schedule</p>
+      <h1 className="text-2xl font-bold text-white mb-1">Instellingen</h1>
+      <p className="text-slate-400 text-sm mb-6">Kies welke sporten in je agenda verschijnen</p>
 
       <div className="space-y-2 mb-8">
         {ALL_SPORTS.map((sport) => {
@@ -115,18 +115,18 @@ export default function SettingsPage() {
             : 'bg-sky-600 hover:bg-sky-500 disabled:opacity-50'
         }`}
       >
-        {saved ? '✓ Saved' : saving ? 'Saving…' : 'Save preferences'}
+        {saved ? '✓ Opgeslagen' : saving ? 'Opslaan…' : 'Opslaan'}
       </button>
 
       {selected.size === 0 && (
         <p className="text-amber-400 text-xs text-center mt-3">
-          Select at least one sport to see events
+          Selecteer minimaal één sport om wedstrijden te zien
         </p>
       )}
 
       <div className="mt-10 pt-6 border-t border-slate-800">
         <p className="text-slate-500 text-xs">
-          Signed in as{' '}
+          Ingelogd als{' '}
           <span className="text-slate-400">{user?.email ?? user?.displayName}</span>
         </p>
       </div>

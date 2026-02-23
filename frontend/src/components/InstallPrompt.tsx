@@ -51,13 +51,13 @@ export default function InstallPrompt() {
   if (showIOSBanner) {
     return (
       <div className="fixed bottom-4 left-4 right-4 z-50 bg-slate-800 border border-slate-700 rounded-2xl p-4 shadow-xl">
-        <p className="text-white font-semibold text-sm mb-1">Add to Home Screen</p>
+        <p className="text-white font-semibold text-sm mb-1">Voeg toe aan beginscherm</p>
         <p className="text-slate-400 text-xs mb-3">
-          Tap <strong className="text-white">Share ↑</strong> then{' '}
-          <strong className="text-white">Add to Home Screen</strong> to install this app.
+          Tik op <strong className="text-white">Delen ↑</strong> en kies{' '}
+          <strong className="text-white">Zet op beginscherm</strong> om de app te installeren.
         </p>
         <button onClick={dismiss} className="text-slate-500 text-xs hover:text-white">
-          Dismiss
+          Sluiten
         </button>
       </div>
     );
@@ -67,14 +67,14 @@ export default function InstallPrompt() {
     return (
       <div className="fixed bottom-4 left-4 right-4 z-50 bg-slate-800 border border-slate-700 rounded-2xl p-4 shadow-xl flex items-center gap-3">
         <div className="flex-1">
-          <p className="text-white font-semibold text-sm">Install app</p>
-          <p className="text-slate-400 text-xs">Get it on your home screen for quick access</p>
+          <p className="text-white font-semibold text-sm">App installeren</p>
+          <p className="text-slate-400 text-xs">Zet op je beginscherm voor snelle toegang</p>
         </div>
         <button
           onClick={installAndroid}
           className="bg-sky-600 text-white text-sm font-semibold px-4 py-2 rounded-lg hover:bg-sky-500 transition-colors"
         >
-          Install
+          Installeren
         </button>
         <button onClick={dismiss} className="text-slate-500 hover:text-white">
           ✕

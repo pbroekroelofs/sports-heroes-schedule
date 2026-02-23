@@ -1,6 +1,7 @@
 'use client';
 
 import { format, isToday, isTomorrow } from 'date-fns';
+import { nl } from 'date-fns/locale';
 import { toZonedTime } from 'date-fns-tz';
 import EventCard from './EventCard';
 import type { SportEvent } from '@/types/events';
@@ -13,14 +14,14 @@ interface Props {
 
 function formatDayHeading(dateKey: string, timezone: string): string {
   const date = toZonedTime(new Date(dateKey + 'T12:00:00Z'), timezone);
-  if (isToday(date)) return 'Today';
-  if (isTomorrow(date)) return 'Tomorrow';
-  return format(date, 'EEEE d MMMM'); // e.g. "Sunday 9 March"
+  if (isToday(date)) return 'Vandaag';
+  if (isTomorrow(date)) return 'Morgen';
+  return format(date, 'EEEE d MMMM', { locale: nl }); // e.g. "zondag 9 maart"
 }
 
 export default function DaySection({ dateKey, events, timezone }: Props) {
   const heading = formatDayHeading(dateKey, timezone);
-  const isCurrentDay = heading === 'Today';
+  const isCurrentDay = heading === 'Vandaag';
 
   return (
     <section className="mb-6">

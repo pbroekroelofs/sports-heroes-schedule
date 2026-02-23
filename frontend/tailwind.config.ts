@@ -6,7 +6,7 @@ const config: Config = {
     extend: {
       colors: {
         // Sport accent colours — used for left border and badge on event cards
-        f1: '#e10600',
+        f1: '#15803d',
         ajax: '#cc0000',
         az: '#b71c1c',
         'mvdp-road': '#0077cc',

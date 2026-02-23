@@ -28,7 +28,7 @@ export default function LoginPage() {
       if (err instanceof FirebaseError) {
         setError(friendlyError(err.code));
       } else {
-        setError('Something went wrong. Please try again.');
+        setError('Er ging iets mis. Probeer het opnieuw.');
       }
     } finally {
       setLoading(false);
@@ -53,9 +53,9 @@ export default function LoginPage() {
   return (
     <div className="flex flex-col items-center justify-center min-h-[80vh] px-6">
       <div className="w-full max-w-sm">
-        <h1 className="text-3xl font-bold text-white mb-2 text-center">🏁 Sports Schedule</h1>
+        <h1 className="text-3xl font-bold text-white mb-2 text-center">🏁 Sportkalender</h1>
         <p className="text-slate-400 text-center mb-8 text-sm">
-          Your personal live sports calendar
+          Jouw persoonlijke live sportkalender
         </p>
 
         {/* Google Sign-in */}
@@ -65,7 +65,7 @@ export default function LoginPage() {
           className="w-full flex items-center justify-center gap-3 bg-white text-slate-900 font-semibold py-3 rounded-xl mb-4 hover:bg-slate-100 transition-colors disabled:opacity-50"
         >
           <GoogleIcon />
-          Continue with Google
+          Doorgaan met Google
         </button>
 
         <div className="flex items-center gap-3 mb-4">
@@ -80,7 +80,7 @@ export default function LoginPage() {
             type="email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            placeholder="Email"
+            placeholder="E-mail"
             required
             className="w-full bg-slate-800 text-white placeholder-slate-500 border border-slate-700 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-sky-600"
           />
@@ -88,7 +88,7 @@ export default function LoginPage() {
             type="password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
-            placeholder="Password"
+            placeholder="Wachtwoord"
             required
             minLength={6}
             className="w-full bg-slate-800 text-white placeholder-slate-500 border border-slate-700 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-sky-600"
@@ -101,12 +101,12 @@ export default function LoginPage() {
             disabled={loading}
             className="w-full bg-sky-600 text-white font-semibold py-3 rounded-xl hover:bg-sky-500 transition-colors disabled:opacity-50"
           >
-            {loading ? 'Please wait…' : mode === 'login' ? 'Sign in' : 'Create account'}
+            {loading ? 'Bezig…' : mode === 'login' ? 'Inloggen' : 'Account aanmaken'}
           </button>
         </form>
 
         <p className="text-slate-500 text-sm text-center mt-5">
-          {mode === 'login' ? "Don't have an account? " : 'Already have an account? '}
+          {mode === 'login' ? 'Nog geen account? ' : 'Al een account? '}
           <button
             onClick={() => {
               setMode(mode === 'login' ? 'register' : 'login');
@@ -114,7 +114,7 @@ export default function LoginPage() {
             }}
             className="text-sky-400 hover:text-sky-300"
           >
-            {mode === 'login' ? 'Sign up' : 'Sign in'}
+            {mode === 'login' ? 'Registreren' : 'Inloggen'}
           </button>
         </p>
       </div>
@@ -147,13 +147,13 @@ function GoogleIcon() {
 
 function friendlyError(code: string): string {
   const messages: Record<string, string> = {
-    'auth/invalid-email': 'Invalid email address.',
-    'auth/user-not-found': 'No account found with this email.',
-    'auth/wrong-password': 'Incorrect password.',
-    'auth/email-already-in-use': 'An account with this email already exists.',
-    'auth/weak-password': 'Password must be at least 6 characters.',
-    'auth/too-many-requests': 'Too many attempts. Please try again later.',
-    'auth/popup-closed-by-user': 'Sign-in popup was closed.',
+    'auth/invalid-email': 'Ongeldig e-mailadres.',
+    'auth/user-not-found': 'Geen account gevonden met dit e-mailadres.',
+    'auth/wrong-password': 'Onjuist wachtwoord.',
+    'auth/email-already-in-use': 'Er bestaat al een account met dit e-mailadres.',
+    'auth/weak-password': 'Wachtwoord moet minimaal 6 tekens bevatten.',
+    'auth/too-many-requests': 'Te veel pogingen. Probeer het later opnieuw.',
+    'auth/popup-closed-by-user': 'Inlogvenster gesloten.',
   };
-  return messages[code] ?? 'Authentication failed. Please try again.';
+  return messages[code] ?? 'Inloggen mislukt. Probeer het opnieuw.';
 }
