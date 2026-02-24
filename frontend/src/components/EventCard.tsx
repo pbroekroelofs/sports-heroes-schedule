@@ -10,12 +10,23 @@ interface Props {
   timezone: string;
 }
 
+function isEventLive(event: SportEvent): boolean {
+  const now = new Date();
+  const start = new Date(event.startTime);
+  if (now < start) return false;
+  const end = event.endTime
+    ? new Date(event.endTime)
+    : new Date(start.getTime() + 120 * 60 * 1000);
+  return now <= end;
+}
+
 export default function EventCard({ event, timezone }: Props) {
   const colors = SPORT_COLORS[event.sport];
   const zonedStart = toZonedTime(new Date(event.startTime), timezone);
   const timeStr = format(zonedStart, 'HH:mm');
   const isToday =
     format(zonedStart, 'yyyy-MM-dd') === format(toZonedTime(new Date(), timezone), 'yyyy-MM-dd');
+  const live = isEventLive(event);
 
   return (
     <a
@@ -26,12 +37,21 @@ export default function EventCard({ event, timezone }: Props) {
     >
       {/* Time column */}
       <div className="flex flex-col items-center justify-center min-w-[52px]">
-        <span className={`text-xl font-bold tabular-nums ${isToday ? 'text-white' : 'text-slate-300'}`}>
-          {timeStr}
-        </span>
-        <span className="text-xs text-slate-500 uppercase tracking-wide">
-          {timezone === 'Europe/Amsterdam' ? 'CET' : 'local'}
-        </span>
+        {live ? (
+          <span className="flex items-center gap-1.5 text-red-400 font-bold text-sm">
+            <span className="w-2 h-2 rounded-full bg-red-400 animate-pulse" />
+            LIVE
+          </span>
+        ) : (
+          <>
+            <span className={`text-xl font-bold tabular-nums ${isToday ? 'text-white' : 'text-slate-300'}`}>
+              {timeStr}
+            </span>
+            <span className="text-xs text-slate-500 uppercase tracking-wide">
+              {timezone === 'Europe/Amsterdam' ? 'CET' : 'local'}
+            </span>
+          </>
+        )}
       </div>
 
       {/* Content */}

@@ -1,5 +1,14 @@
 import { auth } from './firebase';
-import type { SportEvent, UserPreferences } from '@/types/events';
+import type { SportEvent, UserPreferences, SportCategory } from '@/types/events';
+
+export const VAPID_PUBLIC_KEY = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY ?? '';
+
+function urlBase64ToUint8Array(base64String: string): Uint8Array {
+  const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
+  const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+  const rawData = atob(base64);
+  return Uint8Array.from([...rawData].map((char) => char.charCodeAt(0)));
+}
 
 const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8080';
 
@@ -40,4 +49,38 @@ export async function savePreferences(prefs: UserPreferences): Promise<void> {
     body: JSON.stringify(prefs),
   });
   if (!res.ok) throw new Error('Failed to save preferences');
+}
+
+export async function fetchPushSubscription(): Promise<{ sports: SportCategory[] } | null> {
+  const res = await authFetch('/api/notifications/subscribe');
+  if (res.status === 404) return null;
+  if (!res.ok) throw new Error('Failed to fetch push subscription');
+  return res.json();
+}
+
+export async function subscribeToPush(sports: SportCategory[]): Promise<void> {
+  const registration = await navigator.serviceWorker.ready;
+  let sub = await registration.pushManager.getSubscription();
+  if (!sub) {
+    sub = await registration.pushManager.subscribe({
+      userVisibleOnly: true,
+      applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY),
+    });
+  }
+  const subJson = sub.toJSON() as {
+    endpoint: string;
+    keys: { p256dh: string; auth: string };
+  };
+  const res = await authFetch('/api/notifications/subscribe', {
+    method: 'POST',
+    body: JSON.stringify({ subscription: subJson, sports }),
+  });
+  if (!res.ok) throw new Error('Failed to subscribe to push');
+}
+
+export async function unsubscribeFromPush(): Promise<void> {
+  const registration = await navigator.serviceWorker.ready;
+  const sub = await registration.pushManager.getSubscription();
+  if (sub) await sub.unsubscribe();
+  await authFetch('/api/notifications/subscribe', { method: 'DELETE' });
 }

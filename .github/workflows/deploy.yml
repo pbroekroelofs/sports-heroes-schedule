@@ -48,7 +48,7 @@ jobs:
             --platform managed \
             --allow-unauthenticated \
             --service-account sports-schedule-backend@$GCP_PROJECT.iam.gserviceaccount.com \
-            --set-env-vars "NODE_ENV=production,FRONTEND_URL=${{ secrets.FRONTEND_URL }},ZENROWS_API_KEY=${{ secrets.ZENROWS_API_KEY }},CRON_SECRET=${{ secrets.CRON_SECRET }}" \
+            --set-env-vars "NODE_ENV=production,FRONTEND_URL=${{ secrets.FRONTEND_URL }},ZENROWS_API_KEY=${{ secrets.ZENROWS_API_KEY }},CRON_SECRET=${{ secrets.CRON_SECRET }},VAPID_PUBLIC_KEY=${{ secrets.VAPID_PUBLIC_KEY }},VAPID_PRIVATE_KEY=${{ secrets.VAPID_PRIVATE_KEY }}" \
             --set-secrets "FIREBASE_SERVICE_ACCOUNT=firebase-service-account:latest,FOOTBALL_DATA_API_KEY=football-data-api-key:latest"
 
       - name: Update Cloud Scheduler with new cron secret
@@ -56,6 +56,19 @@ jobs:
           gcloud scheduler jobs update http daily-refresh \
             --location europe-west1 \
             --update-headers "X-Cron-Secret=${{ secrets.CRON_SECRET }}" 2>/dev/null || true
+
+      - name: Create or update push-notify Cloud Scheduler job
+        run: |
+          gcloud scheduler jobs create http push-notify \
+            --location europe-west1 \
+            --schedule "*/30 * * * *" \
+            --uri "${{ secrets.BACKEND_URL }}/cron/notify" \
+            --http-method POST \
+            --headers "X-Cron-Secret=${{ secrets.CRON_SECRET }}" \
+            --time-zone "Europe/Amsterdam" 2>/dev/null || \
+          gcloud scheduler jobs update http push-notify \
+            --location europe-west1 \
+            --update-headers "X-Cron-Secret=${{ secrets.CRON_SECRET }}"
 
   deploy-frontend:
     name: Deploy Frontend
@@ -89,6 +102,7 @@ jobs:
             NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=${{ secrets.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID }}
             NEXT_PUBLIC_FIREBASE_APP_ID=${{ secrets.NEXT_PUBLIC_FIREBASE_APP_ID }}
             NEXT_PUBLIC_BACKEND_URL=${{ secrets.BACKEND_URL }}
+            NEXT_PUBLIC_VAPID_PUBLIC_KEY=${{ secrets.VAPID_PUBLIC_KEY }}
 
       - name: Deploy frontend to Cloud Run
         run: |

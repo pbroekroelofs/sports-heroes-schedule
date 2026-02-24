@@ -2,7 +2,9 @@ import { Router } from 'express';
 import { fetchF1Events } from '../fetchers/f1';
 import { fetchAjaxEvents, fetchAZEvents } from '../fetchers/ajax';
 import { fetchCyclingEvents, fetchPuckPieterseEvents } from '../fetchers/cycling';
-import { upsertEvent, deleteEventsForSports, purgeInvalidCyclingEvents } from '../lib/firestore';
+import { upsertEvent, deleteEventsForSports, purgeInvalidCyclingEvents, getEvents, getAllPushSubscriptions, deletePushSubscription } from '../lib/firestore';
+import { sendPushNotification } from '../lib/push';
+import { SPORT_LABELS } from '../types/events';
 
 const router = Router();
 
@@ -70,6 +72,73 @@ router.post('/refresh', async (req, res) => {
 
   console.log('[Cron] Refresh complete:', summary);
   res.json({ ok: true, summary, purged });
+});
+
+/**
+ * POST /cron/notify
+ * Called by Cloud Scheduler every 30 minutes.
+ * Sends push notifications for events starting 25–55 minutes from now.
+ */
+router.post('/notify', async (req, res) => {
+  const cronSecret = ((req.headers['x-cron-secret'] as string) ?? '').trim();
+  const expectedSecret = (process.env.CRON_SECRET ?? '').trim();
+  if (process.env.NODE_ENV === 'production' && cronSecret !== expectedSecret) {
+    res.status(401).json({ error: 'Unauthorized' });
+    return;
+  }
+
+  const now = new Date();
+  const from = new Date(now.getTime() + 25 * 60 * 1000);
+  const to = new Date(now.getTime() + 55 * 60 * 1000);
+
+  const [upcomingEvents, subscriptions] = await Promise.all([
+    getEvents(from, to),
+    getAllPushSubscriptions(),
+  ]);
+
+  if (upcomingEvents.length === 0 || subscriptions.length === 0) {
+    res.json({ ok: true, sent: 0 });
+    return;
+  }
+
+  let sent = 0;
+  const toDelete: string[] = [];
+
+  await Promise.all(
+    subscriptions.map(async (sub) => {
+      const userEvents = upcomingEvents.filter((e) => sub.sports.includes(e.sport));
+      if (userEvents.length === 0) return;
+
+      for (const event of userEvents.slice(0, 5)) {
+        const minutesUntil = Math.round((new Date(event.startTime).getTime() - now.getTime()) / 60000);
+        try {
+          await sendPushNotification(
+            { endpoint: sub.endpoint, keys: sub.keys },
+            {
+              title: SPORT_LABELS[event.sport],
+              body: `${event.title} begint over ${minutesUntil} minuten`,
+              url: event.sourceUrl ?? '/',
+            }
+          );
+          sent++;
+        } catch (err: unknown) {
+          const status = (err as { statusCode?: number }).statusCode;
+          if (status === 410 || status === 404) {
+            // Subscription expired — clean up
+            toDelete.push(sub.uid);
+          } else {
+            console.error(`[Notify] Push failed for uid=${sub.uid}:`, err);
+          }
+        }
+      }
+    })
+  );
+
+  // Remove expired subscriptions
+  await Promise.all(toDelete.map((uid) => deletePushSubscription(uid)));
+
+  console.log(`[Notify] Sent ${sent} push notifications; removed ${toDelete.length} stale subscriptions`);
+  res.json({ ok: true, sent, removed: toDelete.length });
 });
 
 export default router;

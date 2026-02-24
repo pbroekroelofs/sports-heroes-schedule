@@ -1,6 +1,7 @@
 import { initializeApp, cert, getApps } from 'firebase-admin/app';
 import { getFirestore, Timestamp } from 'firebase-admin/firestore';
-import type { SportEvent, UserPreferences } from '../types/events';
+import type { SportEvent, UserPreferences, SportCategory } from '../types/events';
+import type { PushSubscriptionData } from './push';
 
 function initFirebase() {
   if (getApps().length === 0) {
@@ -79,6 +80,33 @@ function isInvalidCompetition(comp: string): boolean {
   if (/^[A-Z]\d+[\s(][A-Z(]/.test(comp)) return true;
   return false;
 }
+
+// ── Push subscriptions ────────────────────────────────────────────────────────
+
+export interface PushSubscriptionDoc extends PushSubscriptionData {
+  sports: SportCategory[];
+  updatedAt: Date;
+}
+
+export async function savePushSubscription(uid: string, sub: PushSubscriptionDoc): Promise<void> {
+  await db.collection('pushSubscriptions').doc(uid).set(sub);
+}
+
+export async function deletePushSubscription(uid: string): Promise<void> {
+  await db.collection('pushSubscriptions').doc(uid).delete();
+}
+
+export async function getPushSubscription(uid: string): Promise<PushSubscriptionDoc | null> {
+  const doc = await db.collection('pushSubscriptions').doc(uid).get();
+  return doc.exists ? (doc.data() as PushSubscriptionDoc) : null;
+}
+
+export async function getAllPushSubscriptions(): Promise<(PushSubscriptionDoc & { uid: string })[]> {
+  const snapshot = await db.collection('pushSubscriptions').get();
+  return snapshot.docs.map((doc) => ({ uid: doc.id, ...(doc.data() as PushSubscriptionDoc) }));
+}
+
+// ── Cycling helpers ───────────────────────────────────────────────────────────
 
 // Deletes ALL events for the given sport categories (used for full cycling refresh).
 export async function deleteEventsForSports(sports: string[]): Promise<void> {

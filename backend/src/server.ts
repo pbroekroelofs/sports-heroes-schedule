@@ -6,6 +6,7 @@ import { db } from './lib/firestore'; // initialises Firebase Admin as a side-ef
 import eventsRouter from './routes/events';
 import cronRouter from './routes/cron';
 import preferencesRouter from './routes/preferences';
+import notificationsRouter from './routes/notifications';
 
 const app = express();
 const PORT = process.env.PORT || 8080;
@@ -44,6 +45,7 @@ async function verifyToken(
 app.get('/health', (_, res) => res.json({ ok: true }));
 app.use('/api/events', verifyToken, eventsRouter);
 app.use('/api/preferences', verifyToken, preferencesRouter);
+app.use('/api/notifications', verifyToken, notificationsRouter);
 app.use('/cron', cronRouter); // protected by CRON_SECRET, not Firebase token
 
 app.listen(PORT, () => {
