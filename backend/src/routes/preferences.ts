@@ -1,10 +1,10 @@
 import { Router } from 'express';
 import { getUserPreferences, setUserPreferences } from '../lib/firestore';
-import type { UserPreferences, SportCategory } from '../types/events';
+import type { SportCategory } from '../types/events';
 
 const router = Router();
 
-// All known sport categories — new entries here are auto-enabled for existing users.
+// When a new sport is added here it will automatically appear enabled for all existing users.
 const ALL_SPORTS: SportCategory[] = [
   'f1', 'ajax', 'az', 'mvdp_road', 'mvdp_cx', 'mvdp_mtb', 'pp_road', 'pp_cx',
 ];
@@ -14,13 +14,21 @@ router.get('/', async (req, res) => {
   try {
     const prefs = await getUserPreferences(uid);
     if (!prefs) {
-      res.json({ sports: ALL_SPORTS, timezone: 'Europe/Amsterdam' } satisfies UserPreferences);
+      res.json({ sports: ALL_SPORTS, timezone: 'Europe/Amsterdam' });
       return;
     }
-    // Merge: add any newly-introduced sports that aren't in the user's saved list yet.
-    const savedSet = new Set(prefs.sports);
-    const merged = [...prefs.sports, ...ALL_SPORTS.filter((s) => !savedSet.has(s))];
-    res.json({ ...prefs, sports: merged } satisfies UserPreferences);
+
+    // Auto-enable sports that didn't exist yet when the user last saved their preferences.
+    // seenSports = undefined means an old account that predates this tracking — treat all
+    // missing sports as new so they appear enabled (one-time migration).
+    const seen = prefs.seenSports ? new Set(prefs.seenSports) : null;
+    const existing = new Set(prefs.sports);
+    const newSports = ALL_SPORTS.filter(
+      (s) => !existing.has(s) && (seen === null || !seen.has(s))
+    );
+
+    // Return only the public fields — seenSports is internal bookkeeping.
+    res.json({ sports: [...prefs.sports, ...newSports], timezone: prefs.timezone });
   } catch (err) {
     console.error('Error fetching preferences:', err);
     res.status(500).json({ error: 'Failed to fetch preferences' });
@@ -29,15 +37,20 @@ router.get('/', async (req, res) => {
 
 router.put('/', async (req, res) => {
   const uid = (req as typeof req & { uid: string }).uid;
-  const prefs = req.body as UserPreferences;
+  const { sports, timezone } = req.body as { sports: unknown; timezone: unknown };
 
-  if (!Array.isArray(prefs.sports) || typeof prefs.timezone !== 'string') {
+  if (!Array.isArray(sports) || typeof timezone !== 'string') {
     res.status(400).json({ error: 'Invalid preferences payload' });
     return;
   }
 
   try {
-    await setUserPreferences(uid, prefs);
+    // Persist seenSports = ALL_SPORTS so future new sports can be detected correctly.
+    await setUserPreferences(uid, {
+      sports: sports as SportCategory[],
+      timezone,
+      seenSports: ALL_SPORTS,
+    });
     res.json({ ok: true });
   } catch (err) {
     console.error('Error saving preferences:', err);

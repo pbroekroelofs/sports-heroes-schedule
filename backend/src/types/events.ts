@@ -34,4 +34,6 @@ export interface SportEvent {
 export interface UserPreferences {
   sports: SportCategory[];
   timezone: string;
+  /** Internal — which sports existed when the user last saved. Used to auto-enable truly new sports. */
+  seenSports?: SportCategory[];
 }

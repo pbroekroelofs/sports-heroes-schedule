@@ -70,7 +70,7 @@ export default function LoginPage() {
 
         <div className="flex items-center gap-3 mb-4">
           <div className="flex-1 h-px bg-slate-800" />
-          <span className="text-slate-600 text-xs">or</span>
+          <span className="text-slate-600 text-xs">of</span>
           <div className="flex-1 h-px bg-slate-800" />
         </div>
 

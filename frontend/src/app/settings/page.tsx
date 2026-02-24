@@ -26,9 +26,7 @@ export default function SettingsPage() {
 
   const { data: prefs, mutate } = useSWR(user ? 'preferences' : null, fetchPreferences);
 
-  const [selected, setSelected] = useState<Set<SportCategory>>(
-    new Set(['f1', 'ajax', 'mvdp_road', 'mvdp_cx', 'mvdp_mtb'])
-  );
+  const [selected, setSelected] = useState<Set<SportCategory>>(new Set(ALL_SPORTS));
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
 
@@ -63,7 +61,7 @@ export default function SettingsPage() {
       setSaved(true);
       setTimeout(() => setSaved(false), 2000);
     } catch {
-      alert('Failed to save. Please try again.');
+      alert('Opslaan mislukt. Probeer het opnieuw.');
     } finally {
       setSaving(false);
     }
