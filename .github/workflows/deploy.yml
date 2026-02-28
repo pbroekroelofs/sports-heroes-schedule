@@ -68,7 +68,7 @@ jobs:
             --time-zone "Europe/Amsterdam" 2>/dev/null || \
           gcloud scheduler jobs update http push-notify \
             --location europe-west1 \
-            --update-headers "X-Cron-Secret=${{ secrets.CRON_SECRET }}"
+            --update-headers "X-Cron-Secret=${{ secrets.CRON_SECRET }}" 2>/dev/null || true
 
   deploy-frontend:
     name: Deploy Frontend
