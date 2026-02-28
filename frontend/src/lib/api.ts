@@ -3,11 +3,12 @@ import type { SportEvent, UserPreferences, SportCategory } from '@/types/events'
 
 export const VAPID_PUBLIC_KEY = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY ?? '';
 
-function urlBase64ToUint8Array(base64String: string): Uint8Array {
+function urlBase64ToUint8Array(base64String: string): Uint8Array<ArrayBuffer> {
   const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
   const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
   const rawData = atob(base64);
-  const output = new Uint8Array(rawData.length);
+  const buf = new ArrayBuffer(rawData.length);
+  const output = new Uint8Array(buf);
   for (let i = 0; i < rawData.length; i++) output[i] = rawData.charCodeAt(i);
   return output;
 }
