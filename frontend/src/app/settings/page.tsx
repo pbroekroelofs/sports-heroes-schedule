@@ -39,7 +39,7 @@ export default function SettingsPage() {
   // Notification state
   const [pushSupported, setPushSupported] = useState(false);
   const [pushEnabled, setPushEnabled] = useState(false);
-  const [notifSports, setNotifSports] = useState<Set<SportCategory>>(new Set(ALL_SPORTS));
+  const [notifSports, setNotifSports] = useState<Set<SportCategory>>(new Set());
   const [pushLoading, setPushLoading] = useState(false);
   const [notifSaved, setNotifSaved] = useState(false);
 
