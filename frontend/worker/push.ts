@@ -1,6 +1,4 @@
-/// <reference lib="webworker" />
-declare const self: ServiceWorkerGlobalScope;
-
+/* eslint-disable no-restricted-globals */
 interface PushPayload {
   title: string;
   body: string;
