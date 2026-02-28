@@ -10,7 +10,7 @@ const withPWA = withPWAInit({
   workboxOptions: {
     disableDevLogs: true,
   },
-  customWorkers: ['worker/push.ts'],
+  customWorkerSrc: 'worker',
 });
 
 const nextConfig: NextConfig = {
