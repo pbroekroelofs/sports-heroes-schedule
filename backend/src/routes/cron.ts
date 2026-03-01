@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { fetchF1Events } from '../fetchers/f1';
 import { fetchAjaxEvents, fetchAZEvents } from '../fetchers/ajax';
 import { fetchCyclingEvents, fetchPuckPieterseEvents } from '../fetchers/cycling';
+import { fetchMvdpAlpecinEvents, fetchPuckAlpecinEvents } from '../fetchers/alpecin';
 import { upsertEvent, deleteEventsForSports, purgeInvalidCyclingEvents, getEvents, getAllPushSubscriptions, deletePushSubscription } from '../lib/firestore';
 import { sendPushNotification } from '../lib/push';
 import { SPORT_LABELS } from '../types/events';
@@ -24,28 +25,44 @@ router.post('/refresh', async (req, res) => {
 
   console.log('[Cron] Starting daily data refresh...');
 
-  const [f1Result, ajaxResult, azResult, mvdpResult, ppResult] = await Promise.allSettled([
+  // Try Alpecin team calendar first (accurate official dates); fall back to PCS on failure/empty.
+  const [f1Result, ajaxResult, azResult, mvdpAlpecinResult, ppAlpecinResult] = await Promise.allSettled([
     fetchF1Events(),
     fetchAjaxEvents(),
     fetchAZEvents(),
-    fetchCyclingEvents(),
-    fetchPuckPieterseEvents(),
+    fetchMvdpAlpecinEvents(),
+    fetchPuckAlpecinEvents(),
+  ]);
+
+  // PCS fallback: only run if Alpecin fetch failed or returned nothing
+  const alpecinMvdp = mvdpAlpecinResult.status === 'fulfilled' ? mvdpAlpecinResult.value : [];
+  const alpecinPp   = ppAlpecinResult.status   === 'fulfilled' ? ppAlpecinResult.value   : [];
+  const needsMvdpFallback = alpecinMvdp.length === 0;
+  const needsPpFallback   = alpecinPp.length   === 0;
+
+  const [mvdpResult, ppResult] = await Promise.all([
+    needsMvdpFallback
+      ? (console.log('[Cron] Alpecin/mvdp empty/failed — falling back to PCS'), fetchCyclingEvents())
+      : Promise.resolve(alpecinMvdp),
+    needsPpFallback
+      ? (console.log('[Cron] Alpecin/pp empty/failed — falling back to PCS'), fetchPuckPieterseEvents())
+      : Promise.resolve(alpecinPp),
   ]);
 
   const allEvents = [
     ...(f1Result.status === 'fulfilled' ? f1Result.value : []),
     ...(ajaxResult.status === 'fulfilled' ? ajaxResult.value : []),
     ...(azResult.status === 'fulfilled' ? azResult.value : []),
-    ...(mvdpResult.status === 'fulfilled' ? mvdpResult.value : []),
-    ...(ppResult.status === 'fulfilled' ? ppResult.value : []),
+    ...mvdpResult,
+    ...ppResult,
   ];
 
   // Full replace for cycling: delete stale entries before inserting fresh ones.
   // Only delete when the fetch succeeded with results, to avoid wiping data on failures.
-  if (mvdpResult.status === 'fulfilled' && mvdpResult.value.length > 0) {
+  if (mvdpResult.length > 0) {
     await deleteEventsForSports(['mvdp_road', 'mvdp_cx', 'mvdp_mtb']);
   }
-  if (ppResult.status === 'fulfilled' && ppResult.value.length > 0) {
+  if (ppResult.length > 0) {
     await deleteEventsForSports(['pp_road', 'pp_cx']);
   }
 
@@ -65,8 +82,10 @@ router.post('/refresh', async (req, res) => {
     f1: f1Result.status === 'fulfilled' ? f1Result.value.length : `ERROR: ${(f1Result as PromiseRejectedResult).reason}`,
     ajax: ajaxResult.status === 'fulfilled' ? ajaxResult.value.length : `ERROR: ${(ajaxResult as PromiseRejectedResult).reason}`,
     az: azResult.status === 'fulfilled' ? azResult.value.length : `ERROR: ${(azResult as PromiseRejectedResult).reason}`,
-    mvdp: mvdpResult.status === 'fulfilled' ? mvdpResult.value.length : `ERROR: ${(mvdpResult as PromiseRejectedResult).reason}`,
-    pp: ppResult.status === 'fulfilled' ? ppResult.value.length : `ERROR: ${(ppResult as PromiseRejectedResult).reason}`,
+    mvdp: mvdpResult.length,
+    mvdp_source: needsMvdpFallback ? 'pcs' : 'alpecin',
+    pp: ppResult.length,
+    pp_source: needsPpFallback ? 'pcs' : 'alpecin',
     total: allEvents.length,
   };
 
