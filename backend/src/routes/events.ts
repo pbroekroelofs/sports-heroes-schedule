@@ -6,7 +6,9 @@ const router = Router();
 router.get('/', async (req, res) => {
   try {
     const now = new Date();
-    const from = req.query.from ? new Date(req.query.from as string) : now;
+    // Default: start of today UTC so in-progress events remain visible all day
+    const startOfToday = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+    const from = req.query.from ? new Date(req.query.from as string) : startOfToday;
     // Default: next 90 days
     const to = req.query.to
       ? new Date(req.query.to as string)

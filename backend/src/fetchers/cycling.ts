@@ -121,7 +121,15 @@ async function fetchRiderEvents(config: RiderConfig): Promise<SportEvent[]> {
     const pcsBase = 'https://www.procyclingstats.com';
 
     // Strategy 1: PCS upcoming section
-    for (const el of $('ul.rdrSeasonList li, .rdrUpcoming li').toArray()) {
+    const strategy1Items = $('ul.rdrSeasonList li, .rdrUpcoming li').toArray();
+    console.log(`[Cycling/${config.slug}] Strategy 1: found ${strategy1Items.length} li items`);
+    // Log first 5 raw items for diagnosis
+    strategy1Items.slice(0, 5).forEach((el, i) => {
+      const dt = $(el).find('.date').first().text().trim();
+      const rn = getLinkText($, el);
+      console.log(`[Cycling/${config.slug}] S1[${i}]: date="${dt}" race="${rn}"`);
+    });
+    for (const el of strategy1Items) {
       const dateText = $(el).find('.date').first().text().trim();
       const raceName = getLinkText($, el);
       const raceUrl = $(el).find('a').first().attr('href');
@@ -146,11 +154,19 @@ async function fetchRiderEvents(config: RiderConfig): Promise<SportEvent[]> {
     // Strategy 2: scan all tables (fallback)
     if (events.length === 0) {
       console.warn(`[Cycling/${config.slug}] Primary selector yielded no results — trying table parse`);
+      let tableRowsLogged = 0;
       for (const table of $('table').toArray()) {
         for (const row of $(table).find('tr').toArray()) {
           const cells = $(row).find('td');
           if (cells.length < 3) continue;
           const dateText = $(cells[0]).text().trim();
+          // Log first 5 candidate rows for diagnosis
+          if (tableRowsLogged < 5) {
+            const c1 = $(cells[1]).text().trim().slice(0, 30);
+            const c2 = $(cells[2]).text().trim().slice(0, 30);
+            console.log(`[Cycling/${config.slug}] S2 row: cells[0]="${dateText}" [1]="${c1}" [2]="${c2}"`);
+            tableRowsLogged++;
+          }
           if (!parsePCSDate(dateText)) continue;
           let raceName = '';
           let raceUrl = '';
