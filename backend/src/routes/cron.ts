@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { fetchF1Events } from '../fetchers/f1';
 import { fetchAjaxEvents, fetchAZEvents } from '../fetchers/ajax';
 import { fetchCyclingEvents, fetchPuckPieterseEvents } from '../fetchers/cycling';
-import { fetchMvdpAlpecinEvents, fetchPuckAlpecinEvents } from '../fetchers/alpecin';
+import { fetchMvdpAlpecinEvents } from '../fetchers/alpecin';
 import { upsertEvent, deleteEventsForSports, purgeInvalidCyclingEvents, getEvents, getAllPushSubscriptions, deletePushSubscription } from '../lib/firestore';
 import { sendPushNotification } from '../lib/push';
 import { SPORT_LABELS } from '../types/events';
@@ -25,29 +25,28 @@ router.post('/refresh', async (req, res) => {
 
   console.log('[Cron] Starting daily data refresh...');
 
-  // Try Alpecin team calendar first (accurate official dates); fall back to PCS on failure/empty.
-  const [f1Result, ajaxResult, azResult, mvdpAlpecinResult, ppAlpecinResult] = await Promise.allSettled([
+  // MvdP: Alpecin-Premier Tech official API (men's team calendar).
+  // Puck: PCS via ZenRows — she's on Fenix-Deceuninck (road) + Alpecin-Deceuninck (CX),
+  //       neither of which is Alpecin-Premier Tech.
+  const [f1Result, ajaxResult, azResult, mvdpAlpecinResult, ppPcsResult] = await Promise.allSettled([
     fetchF1Events(),
     fetchAjaxEvents(),
     fetchAZEvents(),
     fetchMvdpAlpecinEvents(),
-    fetchPuckAlpecinEvents(),
+    fetchPuckPieterseEvents(),
   ]);
 
-  // PCS fallback: only run if Alpecin fetch failed or returned nothing
+  // MvdP fallback to PCS if Alpecin API fails/empty
   const alpecinMvdp = mvdpAlpecinResult.status === 'fulfilled' ? mvdpAlpecinResult.value : [];
-  const alpecinPp   = ppAlpecinResult.status   === 'fulfilled' ? ppAlpecinResult.value   : [];
   const needsMvdpFallback = alpecinMvdp.length === 0;
-  const needsPpFallback   = alpecinPp.length   === 0;
 
-  const [mvdpResult, ppResult] = await Promise.all([
+  const [mvdpResult] = await Promise.all([
     needsMvdpFallback
       ? (console.log('[Cron] Alpecin/mvdp empty/failed — falling back to PCS'), fetchCyclingEvents())
       : Promise.resolve(alpecinMvdp),
-    needsPpFallback
-      ? (console.log('[Cron] Alpecin/pp empty/failed — falling back to PCS'), fetchPuckPieterseEvents())
-      : Promise.resolve(alpecinPp),
   ]);
+
+  const ppResult = ppPcsResult.status === 'fulfilled' ? ppPcsResult.value : [];
 
   const allEvents = [
     ...(f1Result.status === 'fulfilled' ? f1Result.value : []),
@@ -85,7 +84,7 @@ router.post('/refresh', async (req, res) => {
     mvdp: mvdpResult.length,
     mvdp_source: needsMvdpFallback ? 'pcs' : 'alpecin',
     pp: ppResult.length,
-    pp_source: needsPpFallback ? 'pcs' : 'alpecin',
+    pp_source: ppPcsResult.status === 'fulfilled' && ppResult.length > 0 ? 'pcs' : 'none',
     total: allEvents.length,
   };
 

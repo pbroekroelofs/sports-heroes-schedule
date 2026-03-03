@@ -111,14 +111,6 @@ const MVDP_CONFIG: RiderConfig = {
   mtb: 'mvdp_mtb',
 };
 
-const PUCK_CONFIG: RiderConfig = {
-  riderName: 'Puck Pieterse',
-  idPrefix: 'pp',
-  road: 'pp_road',
-  cx: 'pp_cx',
-  mtb: 'pp_cx',   // Puck rides cx and mtb under the same category
-};
-
 function buildEvents(apiEvents: AlpecinApiEvent[], config: RiderConfig): SportEvent[] {
   return apiEvents.map((ev) => {
     const disc = disciplineToCategory(ev.discipline_slug);
@@ -166,18 +158,6 @@ export async function fetchMvdpAlpecinEvents(): Promise<SportEvent[]> {
     return built;
   } catch (err) {
     console.error('[Alpecin/mvdp] Failed:', err);
-    return [];
-  }
-}
-
-export async function fetchPuckAlpecinEvents(): Promise<SportEvent[]> {
-  try {
-    const events = await getCachedEvents();
-    const built = buildEvents(events, PUCK_CONFIG);
-    console.log(`[Alpecin/pp] Built ${built.length} events`);
-    return built;
-  } catch (err) {
-    console.error('[Alpecin/pp] Failed:', err);
     return [];
   }
 }

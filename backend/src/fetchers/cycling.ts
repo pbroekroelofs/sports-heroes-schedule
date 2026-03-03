@@ -34,8 +34,8 @@ function detectCategory(raceName: string, config: RiderConfig): SportCategory {
 }
 
 function parsePCSDate(dateText: string): Date | null {
-  // Handle ranges like "22.02-25.02": take start date
-  const cleanDate = dateText.split('-')[0].trim();
+  // Handle ranges: "22.02-25.02" or "26.07 › 03.08" — take start date only
+  const cleanDate = dateText.split('›')[0].split('-')[0].trim();
   const match = cleanDate.match(/^(\d{1,2})\.(\d{2})(?:\.(\d{4}))?$/);
   if (!match) return null;
   const day = parseInt(match[1], 10);
