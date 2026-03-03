@@ -1,59 +1,104 @@
+/**
+ * F1 schedule fetcher — uses the Jolpica API (maintained Ergast fork).
+ *
+ * GET https://api.jolpi.ca/ergast/f1/{year}/races.json?limit=50
+ *
+ * Each race object includes session dates for Qualifying, Sprint, and Race.
+ * Practice sessions are intentionally excluded.
+ */
 import axios from 'axios';
+import { v5 as uuidv5 } from 'uuid';
 import type { SportEvent } from '../types/events';
 
-interface OpenF1Session {
-  session_key: number;
-  session_name: string;
-  session_type: string;
-  date_start: string;
-  date_end: string;
-  meeting_name?: string;
-  gp_name?: string;
-  location: string;
-  country_name: string;
-  circuit_short_name?: string;
-  year: number;
+const UUID_NAMESPACE = '6ba7b810-9dad-11d1-80b4-00c04fd430c8';
+const JOLPICA_BASE = 'https://api.jolpi.ca/ergast/f1';
+
+// ─── API types ────────────────────────────────────────────────────────────────
+
+interface JolpicaSession {
+  date: string;   // "2026-03-15"
+  time?: string;  // "05:00:00Z"
 }
 
-const RELEVANT_TYPES = new Set(['Race', 'Qualifying', 'Sprint', 'Sprint Qualifying', 'Sprint Shootout']);
-
-function getGpName(session: OpenF1Session): string {
-  return session.meeting_name || session.gp_name || `${session.country_name} Grand Prix`;
+interface JolpicaRace {
+  round: string;
+  raceName: string;
+  date: string;
+  time?: string;
+  Circuit: {
+    circuitName: string;
+    Location: { locality: string; country: string };
+  };
+  Qualifying?: JolpicaSession;
+  Sprint?: JolpicaSession;
+  SprintQualifying?: JolpicaSession;
+  SprintShootout?: JolpicaSession;
 }
 
-export async function fetchF1Events(): Promise<SportEvent[]> {
-  const currentYear = new Date().getFullYear();
-  const years = [currentYear, currentYear + 1];
-  const events: SportEvent[] = [];
+interface JolpicaResponse {
+  MRData: { RaceTable: { Races: JolpicaRace[] } };
+}
 
-  for (const year of years) {
-    try {
-      const { data } = await axios.get<OpenF1Session[]>(
-        `https://api.openf1.org/v1/sessions?year=${year}`,
-        { timeout: 10_000 }
-      );
+// ─── Helpers ──────────────────────────────────────────────────────────────────
 
-      const relevant = data.filter((s) => RELEVANT_TYPES.has(s.session_type));
+function toISO(date: string, time?: string): string {
+  return time ? `${date}T${time}` : `${date}T00:00:00Z`;
+}
 
-      for (const session of relevant) {
-        const gpName = getGpName(session);
+async function fetchYear(year: number): Promise<SportEvent[]> {
+  try {
+    const { data } = await axios.get<JolpicaResponse>(
+      `${JOLPICA_BASE}/${year}/races.json`,
+      { params: { limit: 50 }, timeout: 15_000 },
+    );
+
+    const races = data.MRData?.RaceTable?.Races ?? [];
+    const now = new Date();
+    const events: SportEvent[] = [];
+
+    for (const race of races) {
+      const location = `${race.Circuit.Location.locality}, ${race.Circuit.Location.country}`;
+
+      const push = (sessionName: string, session: JolpicaSession) => {
+        const startTime = toISO(session.date, session.time);
+        if (new Date(startTime) < now) return;
+        const id = uuidv5(`f1_${year}_${race.round}_${sessionName}`, UUID_NAMESPACE);
         events.push({
-          id: `f1_${session.session_key}`,
+          id,
           sport: 'f1',
-          title: `${gpName} \u2013 ${session.session_name}`,
-          competition: 'Formula 1',
-          startTime: session.date_start,
-          endTime: session.date_end,
-          location: `${session.location}, ${session.country_name}`,
+          title: `${race.raceName} \u2013 ${sessionName}`,
+          competition: race.raceName,
+          startTime,
+          location,
           fetchedAt: new Date().toISOString(),
           sourceUrl: 'https://www.formula1.com/en/racing.html',
         });
-      }
-    } catch (err) {
-      console.error(`[F1] Failed to fetch sessions for ${year}:`, err);
-    }
-  }
+      };
 
-  console.log(`[F1] Fetched ${events.length} events`);
+      if (race.Qualifying)      push('Qualifying',         race.Qualifying);
+      if (race.SprintQualifying) push('Sprint Qualifying',  race.SprintQualifying);
+      if (race.SprintShootout)  push('Sprint Shootout',    race.SprintShootout);
+      if (race.Sprint)          push('Sprint',             race.Sprint);
+      push('Race', { date: race.date, time: race.time });
+    }
+
+    return events;
+  } catch (err) {
+    console.error(`[F1] Failed to fetch ${year} schedule:`, err);
+    return [];
+  }
+}
+
+// ─── Public export ────────────────────────────────────────────────────────────
+
+export async function fetchF1Events(): Promise<SportEvent[]> {
+  const now = new Date();
+  const year = now.getUTCFullYear();
+  // Fetch next year too in Nov/Dec when the new calendar is already published
+  const years = now.getUTCMonth() >= 10 ? [year, year + 1] : [year];
+
+  const results = await Promise.all(years.map(fetchYear));
+  const events = results.flat();
+  console.log(`[F1] Fetched ${events.length} upcoming events`);
   return events;
 }

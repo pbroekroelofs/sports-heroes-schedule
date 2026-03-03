@@ -55,8 +55,11 @@ router.post('/refresh', async (req, res) => {
     ...ppResult,
   ];
 
-  // Full replace for cycling: delete stale entries before inserting fresh ones.
+  // Full replace for sports that use stable IDs: delete stale entries first.
   // Only delete when the fetch succeeded with results, to avoid wiping data on failures.
+  if (f1Result.status === 'fulfilled' && f1Result.value.length > 0) {
+    await deleteEventsForSports(['f1']);
+  }
   if (mvdpResult.length > 0) {
     await deleteEventsForSports(['mvdp_road', 'mvdp_cx', 'mvdp_mtb']);
   }
