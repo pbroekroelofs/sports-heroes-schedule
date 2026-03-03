@@ -1,173 +1,102 @@
 /**
  * Alpecin-Premier Tech team calendar fetcher.
  *
- * Uses ZenRows JS rendering to get the fully rendered team calendar page,
- * then extracts upcoming race entries for MvdP and Puck Pieterse.
+ * Calls the team's own JSON API directly:
+ *   GET /calendar/events.php?year=YYYY&month=M
  *
- * Because both riders are on the same team we fetch the page ONCE per cron
- * run and split the results by rider.
+ * The calendar shows all team race entries (both MvdP and Puck Pieterse
+ * are on the same team), so we return the same event list for both riders.
  *
- * First-run note: the HTML preview logged to Cloud Run will reveal the exact
- * element structure so the selectors below can be refined if needed.
+ * No ZenRows / JS rendering needed — the API is a plain JSON endpoint.
  */
 import axios from 'axios';
-import * as cheerio from 'cheerio';
 import { v5 as uuidv5 } from 'uuid';
 import type { SportEvent, SportCategory } from '../types/events';
 
 const UUID_NAMESPACE = '6ba7b810-9dad-11d1-80b4-00c04fd430c8';
-const ALPECIN_CALENDAR = 'https://www.alpecin-premiertech.com/calendar/';
-const ALPECIN_BASE = 'https://www.alpecin-premiertech.com';
+const API_BASE = 'https://www.alpecin-premiertech.com/calendar/events.php';
 
-// ─── Date parsing ────────────────────────────────────────────────────────────
+// ─── API types ────────────────────────────────────────────────────────────────
 
-const NL_MONTHS: Record<string, number> = {
-  januari: 0, februari: 1, maart: 2, april: 3, mei: 4, juni: 5,
-  juli: 6, augustus: 7, september: 8, oktober: 9, november: 10, december: 11,
-  // English fallbacks
-  january: 0, february: 1, march: 2, may: 4, june: 5, july: 6,
-  august: 7, october: 9,
-};
-
-function parseDate(raw: string): Date | null {
-  const s = raw.trim();
-  // ISO: 2026-03-07
-  if (/^\d{4}-\d{2}-\d{2}/.test(s)) {
-    const d = new Date(s.slice(0, 10) + 'T10:00:00Z');
-    return isNaN(d.getTime()) ? null : d;
-  }
-  // DD.MM.YYYY or DD/MM/YYYY or DD-MM-YYYY
-  const dotMatch = s.match(/^(\d{1,2})[.\/-](\d{2})[.\/-](\d{4})$/);
-  if (dotMatch) {
-    const d = new Date(Date.UTC(+dotMatch[3], +dotMatch[2] - 1, +dotMatch[1], 10, 0, 0));
-    return isNaN(d.getTime()) ? null : d;
-  }
-  // Dutch/English text: "7 maart 2026" or "March 7, 2026"
-  const textMatch = s.match(/^(\d{1,2})\s+(\w+)\s+(\d{4})$/i)
-    ?? s.match(/^(\w+)\s+(\d{1,2}),?\s+(\d{4})$/i);
-  if (textMatch) {
-    // Try both orderings
-    for (const [d, m, y] of [[textMatch[1], textMatch[2], textMatch[3]], [textMatch[2], textMatch[1], textMatch[3]]]) {
-      if (/^\d+$/.test(d)) {
-        const month = NL_MONTHS[m.toLowerCase()];
-        if (month !== undefined) {
-          const date = new Date(Date.UTC(+y, month, +d, 10, 0, 0));
-          if (!isNaN(date.getTime())) return date;
-        }
-      }
-    }
-  }
-  return null;
+interface AlpecinApiEvent {
+  id: string;
+  name: string;
+  location: string;
+  category: string;
+  championship: string;
+  date_start: string;   // "2026-03-07"
+  date_end: string | null;
+  discipline_slug: string;  // "wt" | "cc" | "mt" | "dv"
+  discipline_name: string;
+  discipline_color: string;
+  iso2: string;
+  country_name: string;
+  flag_url: string;
+  date_label: string;
 }
 
-// ─── Category detection ───────────────────────────────────────────────────────
+interface AlpecinApiResponse {
+  events: AlpecinApiEvent[];
+}
 
-function detectCategory(text: string): 'road' | 'cx' | 'mtb' {
-  const l = text.toLowerCase();
-  if (l.includes('cyclocross') || l.includes('cross') || l.includes('superprestige') ||
-      l.includes('x2o') || l.includes('dvv') || l.includes(' cx') || l.startsWith('cx ')) return 'cx';
-  if (l.includes('mtb') || l.includes('mountain bike') || l.includes('xco') ||
-      l.includes('xcm') || l.includes('cross country')) return 'mtb';
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+function disciplineToCategory(slug: string): 'road' | 'cx' | 'mtb' {
+  if (slug === 'cc') return 'cx';
+  if (slug === 'mt') return 'mtb';
   return 'road';
+}
+
+async function fetchMonth(year: number, month: number): Promise<AlpecinApiEvent[]> {
+  try {
+    const { data } = await axios.get<AlpecinApiResponse>(API_BASE, {
+      params: { year, month },
+      headers: { Accept: 'application/json' },
+      timeout: 15_000,
+    });
+    return data.events ?? [];
+  } catch (err) {
+    console.warn(`[Alpecin] Failed to fetch ${year}-${month}:`, (err as Error).message);
+    return [];
+  }
 }
 
 // ─── Main fetch ───────────────────────────────────────────────────────────────
 
-interface RaceEntry {
-  date: Date;
-  name: string;
-  url: string;
-  text: string;   // full text of entry (used for rider name matching)
-  disc: 'road' | 'cx' | 'mtb';
-}
+async function fetchAllUpcoming(): Promise<AlpecinApiEvent[]> {
+  const today = new Date();
+  const todayISO = today.toISOString().slice(0, 10);
 
-async function fetchRenderedHtml(): Promise<string> {
-  const zenRowsKey = (process.env.ZENROWS_API_KEY ?? '').trim();
-  if (!zenRowsKey) throw new Error('ZENROWS_API_KEY is required for Alpecin calendar (JS-rendered)');
-
-  const { data } = await axios.get<string>('https://api.zenrows.com/v1/', {
-    params: {
-      apikey: zenRowsKey,
-      url: ALPECIN_CALENDAR,
-      js_render: 'true',
-      wait: '3000',
-    },
-    timeout: 50_000,
-  });
-  return data;
-}
-
-async function extractRaceEntries(html: string): Promise<RaceEntry[]> {
-  const $ = cheerio.load(html);
-  const entries: RaceEntry[] = [];
-  const now = new Date();
-
-  // ── Diagnostic logging ────────────────────────────────────────────────────
-  console.log(`[Alpecin] HTML length: ${html.length}`);
-  console.log(`[Alpecin] HTML preview:\n${html.slice(0, 4000)}`);
-
-  // Log counts for common element types to understand the DOM
-  for (const sel of ['article', 'section', 'li', 'tr', '[class*="race"]', '[class*="event"]',
-                      '[class*="calendar"]', '[class*="item"]', 'time[datetime]']) {
-    const n = $(sel).length;
-    if (n > 0) console.log(`[Alpecin] "${sel}": ${n} elements`);
+  // Fetch from current month for the next 12 months
+  const months: Array<{ year: number; month: number }> = [];
+  let y = today.getUTCFullYear();
+  let m = today.getUTCMonth() + 1;
+  for (let i = 0; i < 12; i++) {
+    months.push({ year: y, month: m });
+    m++;
+    if (m > 12) { m = 1; y++; }
   }
 
-  // ── Strategy A: <time datetime="..."> elements (most reliable) ────────────
-  $('time[datetime]').each((_i, el) => {
-    const dt = $(el).attr('datetime') ?? '';
-    const date = parseDate(dt);
-    if (!date || date < now) return;
+  const results = await Promise.all(months.map(({ year, month }) => fetchMonth(year, month)));
+  const allEvents = results.flat();
 
-    const container = $(el).closest('article, li, tr, [class*="race"], [class*="event"], [class*="item"], div');
-    const text = container.text().replace(/\s+/g, ' ').trim();
-    const heading = container.find('h1,h2,h3,h4,h5,a').first().text().trim();
-    const name = heading || text.slice(0, 80);
-    const href = container.find('a').first().attr('href') ?? '';
-    const url = href.startsWith('http') ? href : href ? `${ALPECIN_BASE}${href}` : ALPECIN_CALENDAR;
-
-    if (name.length >= 4) {
-      entries.push({ date, name, url, text, disc: detectCategory(name + ' ' + text) });
-    }
+  // Deduplicate by id, keep only upcoming events
+  const seen = new Set<string>();
+  const upcoming = allEvents.filter((ev) => {
+    if (ev.date_start < todayISO) return false;
+    if (seen.has(ev.id)) return false;
+    seen.add(ev.id);
+    return true;
   });
 
-  // ── Strategy B: ISO/DD.MM dates in text of candidate containers ───────────
-  if (entries.length === 0) {
-    console.log('[Alpecin] Strategy A (time[datetime]) yielded nothing — trying text date scan');
-
-    const DATE_RE = /\b(\d{4}-\d{2}-\d{2}|\d{1,2}[.\/-]\d{2}[.\/-]\d{4})\b/g;
-    const containers = $('article, li, tr, [class*="race"], [class*="event"], [class*="calendar"]').toArray();
-
-    for (const el of containers) {
-      const text = $(el).text().replace(/\s+/g, ' ').trim();
-      const matches = [...text.matchAll(DATE_RE)];
-      if (!matches.length) continue;
-
-      for (const m of matches) {
-        const date = parseDate(m[1]);
-        if (!date || date < now) continue;
-
-        const heading = $(el).find('h1,h2,h3,h4,h5,a').first().text().trim();
-        const name = heading || text.slice(0, 80);
-        const href = $(el).find('a').first().attr('href') ?? '';
-        const url = href.startsWith('http') ? href : href ? `${ALPECIN_BASE}${href}` : ALPECIN_CALENDAR;
-
-        if (name.length >= 4) {
-          entries.push({ date, name, url, text, disc: detectCategory(name + ' ' + text) });
-        }
-      }
-    }
-  }
-
-  console.log(`[Alpecin] Extracted ${entries.length} candidate entries`);
-  return entries;
+  console.log(`[Alpecin] Fetched ${upcoming.length} upcoming team events`);
+  return upcoming;
 }
 
 // ─── Per-rider event builder ──────────────────────────────────────────────────
 
 interface RiderConfig {
   riderName: string;
-  searchTerms: string[];   // substrings to match rider in entry text
   idPrefix: string;
   road: SportCategory;
   cx: SportCategory;
@@ -176,79 +105,65 @@ interface RiderConfig {
 
 const MVDP_CONFIG: RiderConfig = {
   riderName: 'Mathieu van der Poel',
-  searchTerms: ['mathieu', 'van der poel', 'mvdp'],
   idPrefix: 'mvdp',
-  road: 'mvdp_road', cx: 'mvdp_cx', mtb: 'mvdp_mtb',
+  road: 'mvdp_road',
+  cx: 'mvdp_cx',
+  mtb: 'mvdp_mtb',
 };
 
 const PUCK_CONFIG: RiderConfig = {
   riderName: 'Puck Pieterse',
-  searchTerms: ['puck', 'pieterse'],
   idPrefix: 'pp',
-  road: 'pp_road', cx: 'pp_cx', mtb: 'pp_cx',
+  road: 'pp_road',
+  cx: 'pp_cx',
+  mtb: 'pp_cx',   // Puck rides cx and mtb under the same category
 };
 
-function buildEvents(entries: RaceEntry[], config: RiderConfig): SportEvent[] {
-  const events: SportEvent[] = [];
-  const seen = new Set<string>();
-
-  // Check whether ANY entry mentions a rider name at all
-  const anyRiderMentioned = entries.some((e) =>
-    [...MVDP_CONFIG.searchTerms, ...PUCK_CONFIG.searchTerms].some((t) =>
-      e.text.toLowerCase().includes(t)
-    )
-  );
-
-  for (const entry of entries) {
-    // If rider names appear anywhere, filter by this rider; otherwise include all
-    if (anyRiderMentioned) {
-      const matches = config.searchTerms.some((t) => entry.text.toLowerCase().includes(t));
-      if (!matches) continue;
-    }
-
-    const key = `${entry.date.toISOString().slice(0, 10)}_${entry.name}`;
-    if (seen.has(key)) continue;
-    seen.add(key);
-
+function buildEvents(apiEvents: AlpecinApiEvent[], config: RiderConfig): SportEvent[] {
+  return apiEvents.map((ev) => {
+    const disc = disciplineToCategory(ev.discipline_slug);
     const sport: SportCategory =
-      entry.disc === 'cx' ? config.cx : entry.disc === 'mtb' ? config.mtb : config.road;
+      disc === 'cx' ? config.cx : disc === 'mtb' ? config.mtb : config.road;
 
-    const id = uuidv5(`${config.idPrefix}_${key}`, UUID_NAMESPACE);
-    events.push({
-      id, sport,
-      title: `${entry.name} \u2013 ${config.riderName}`,
-      competition: entry.name,
-      startTime: entry.date.toISOString(),
+    const key = `${config.idPrefix}_${ev.id}_${ev.date_start}`;
+    const id = uuidv5(key, UUID_NAMESPACE);
+
+    const event: SportEvent = {
+      id,
+      sport,
+      title: `${ev.name} \u2013 ${config.riderName}`,
+      competition: ev.name,
+      startTime: `${ev.date_start}T10:00:00Z`,
       fetchedAt: new Date().toISOString(),
-      sourceUrl: entry.url,
-    });
-  }
-
-  console.log(`[Alpecin/${config.idPrefix}] Built ${events.length} events`);
-  return events;
+      sourceUrl: 'https://www.alpecin-premiertech.com/calendar/',
+    };
+    if (ev.date_end) event.endTime = `${ev.date_end}T17:00:00Z`;
+    return event;
+  });
 }
 
 // ─── Cached fetch (shared between MvdP and Puck within one cron run) ──────────
 
-let cachedHtml: string | null = null;
+let cachedEvents: AlpecinApiEvent[] | null = null;
 let cacheTime = 0;
 
-async function getCachedEntries(): Promise<RaceEntry[]> {
+async function getCachedEvents(): Promise<AlpecinApiEvent[]> {
   const now = Date.now();
-  // Cache for up to 10 minutes within a single process
-  if (!cachedHtml || now - cacheTime > 10 * 60 * 1000) {
-    cachedHtml = await fetchRenderedHtml();
+  if (!cachedEvents || now - cacheTime > 10 * 60 * 1000) {
+    cachedEvents = await fetchAllUpcoming();
     cacheTime = now;
   }
-  return extractRaceEntries(cachedHtml);
+  return cachedEvents;
 }
 
 // ─── Public exports ───────────────────────────────────────────────────────────
 
 export async function fetchMvdpAlpecinEvents(): Promise<SportEvent[]> {
   try {
-    const entries = await getCachedEntries();
-    return buildEvents(entries, MVDP_CONFIG);
+    const events = await getCachedEvents();
+    const built = buildEvents(events, MVDP_CONFIG);
+    console.log(`[Alpecin/mvdp] Built ${built.length} events`);
+    return built;
   } catch (err) {
     console.error('[Alpecin/mvdp] Failed:', err);
     return [];
@@ -257,8 +172,10 @@ export async function fetchMvdpAlpecinEvents(): Promise<SportEvent[]> {
 
 export async function fetchPuckAlpecinEvents(): Promise<SportEvent[]> {
   try {
-    const entries = await getCachedEntries();
-    return buildEvents(entries, PUCK_CONFIG);
+    const events = await getCachedEvents();
+    const built = buildEvents(events, PUCK_CONFIG);
+    console.log(`[Alpecin/pp] Built ${built.length} events`);
+    return built;
   } catch (err) {
     console.error('[Alpecin/pp] Failed:', err);
     return [];
