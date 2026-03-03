@@ -4,8 +4,9 @@
  * Calls the team's own JSON API directly:
  *   GET /calendar/events.php?year=YYYY&month=M
  *
- * The calendar shows all team race entries (both MvdP and Puck Pieterse
- * are on the same team), so we return the same event list for both riders.
+ * The calendar shows all Alpecin-Premier Tech team entries (men's team only).
+ * Used in cron.ts as a fallback for MvdP when PCS (procyclingstats.com) is
+ * unavailable. Primary source for MvdP is PCS (rider-specific schedule).
  *
  * No ZenRows / JS rendering needed — the API is a plain JSON endpoint.
  */

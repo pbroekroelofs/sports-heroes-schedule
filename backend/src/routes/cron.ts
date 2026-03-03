@@ -25,25 +25,24 @@ router.post('/refresh', async (req, res) => {
 
   console.log('[Cron] Starting daily data refresh...');
 
-  // MvdP: Alpecin-Premier Tech official API (men's team calendar).
-  // Puck: PCS via ZenRows — she's on Fenix-Deceuninck (road) + Alpecin-Deceuninck (CX),
-  //       neither of which is Alpecin-Premier Tech.
-  const [f1Result, ajaxResult, azResult, mvdpAlpecinResult, ppPcsResult] = await Promise.allSettled([
+  // Both MvdP and Puck use PCS (rider-specific schedule) as primary source.
+  // MvdP falls back to Alpecin team API if PCS fails/empty.
+  const [f1Result, ajaxResult, azResult, mvdpPcsResult, ppPcsResult] = await Promise.allSettled([
     fetchF1Events(),
     fetchAjaxEvents(),
     fetchAZEvents(),
-    fetchMvdpAlpecinEvents(),
-    fetchPuckPieterseEvents(),
+    fetchCyclingEvents(),        // PCS for MvdP (primary)
+    fetchPuckPieterseEvents(),   // PCS for Puck (primary)
   ]);
 
-  // MvdP fallback to PCS if Alpecin API fails/empty
-  const alpecinMvdp = mvdpAlpecinResult.status === 'fulfilled' ? mvdpAlpecinResult.value : [];
-  const needsMvdpFallback = alpecinMvdp.length === 0;
+  // MvdP: PCS primary, Alpecin fallback if PCS fails/empty
+  const pcsMvdp = mvdpPcsResult.status === 'fulfilled' ? mvdpPcsResult.value : [];
+  const needsMvdpFallback = pcsMvdp.length === 0;
 
   const [mvdpResult] = await Promise.all([
     needsMvdpFallback
-      ? (console.log('[Cron] Alpecin/mvdp empty/failed — falling back to PCS'), fetchCyclingEvents())
-      : Promise.resolve(alpecinMvdp),
+      ? (console.log('[Cron] PCS/mvdp empty/failed — falling back to Alpecin'), fetchMvdpAlpecinEvents())
+      : Promise.resolve(pcsMvdp),
   ]);
 
   const ppResult = ppPcsResult.status === 'fulfilled' ? ppPcsResult.value : [];
@@ -82,7 +81,7 @@ router.post('/refresh', async (req, res) => {
     ajax: ajaxResult.status === 'fulfilled' ? ajaxResult.value.length : `ERROR: ${(ajaxResult as PromiseRejectedResult).reason}`,
     az: azResult.status === 'fulfilled' ? azResult.value.length : `ERROR: ${(azResult as PromiseRejectedResult).reason}`,
     mvdp: mvdpResult.length,
-    mvdp_source: needsMvdpFallback ? 'pcs' : 'alpecin',
+    mvdp_source: needsMvdpFallback ? 'alpecin' : 'pcs',
     pp: ppResult.length,
     pp_source: ppPcsResult.status === 'fulfilled' && ppResult.length > 0 ? 'pcs' : 'none',
     total: allEvents.length,
