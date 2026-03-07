@@ -93,12 +93,11 @@ async function fetchHtml(riderSlug: string): Promise<string> {
   const zenRowsKey = (process.env.ZENROWS_API_KEY ?? '').trim();
 
   if (zenRowsKey) {
-    const resp = await axios.get<string>('https://api.zenrows.com/v1/', {
+    const { data } = await axios.get<string>('https://api.zenrows.com/v1/', {
       params: { apikey: zenRowsKey, url, js_render: 'false' },
       timeout: 20_000,
     });
-    console.log(`[Cycling/${riderSlug}] ZenRows status=${resp.status} html_start="${resp.data.slice(0, 120).replace(/\s+/g, ' ')}"`);
-    return resp.data;
+    return data;
   }
 
   const { data } = await axios.get<string>(url, {
@@ -117,29 +116,14 @@ async function fetchRiderEvents(config: RiderConfig): Promise<SportEvent[]> {
     const html = await fetchHtml(config.slug);
     const $ = cheerio.load(html);
 
-    // Page diagnostics — log title + ul/div class names to detect HTML structure changes
-    const pageTitle = $('title').text().trim().slice(0, 80);
-    const ulClasses = [...new Set($('ul[class]').map((_, el) => $(el).attr('class') as string).get())].slice(0, 8).join(' | ');
-    console.log(`[Cycling/${config.slug}] Page title: "${pageTitle}"`);
-    console.log(`[Cycling/${config.slug}] UL classes: ${ulClasses || '(none)'}`);
-
     const events: SportEvent[] = [];
     const now = new Date();
     const seen = new Set<string>();
     const pcsBase = 'https://www.procyclingstats.com';
 
-    // Diagnostic: sample first 3 li items from candidate UL selectors to detect new structure
-    ['ul.pps.list', 'ul.list.dashed', 'ul[class*="rdr"]', 'ul[class*="fs14"]'].forEach((sel) => {
-      const items = $(sel).first().find('li').slice(0, 3).toArray();
-      if (items.length > 0) {
-        const sample = items.map((el) => $(el).text().trim().replace(/\s+/g, ' ').slice(0, 60)).join(' || ');
-        console.log(`[Cycling/${config.slug}] ${sel}: ${sample}`);
-      }
-    });
-
     // Strategy 1: PCS upcoming section
-    // Tries both legacy selectors and new candidates observed in UL class logs.
-    const strategy1Items = $('ul.rdrSeasonList li, .rdrUpcoming li, ul.pps.list li').toArray();
+    // ul.list.dashed is the current PCS selector (as of March 2026); legacy selectors kept as fallback.
+    const strategy1Items = $('ul.rdrSeasonList li, .rdrUpcoming li, ul.list.dashed li').toArray();
     console.log(`[Cycling/${config.slug}] Strategy 1: found ${strategy1Items.length} li items`);
     // Log first 5 raw items for diagnosis
     strategy1Items.slice(0, 5).forEach((el, i) => {
@@ -148,7 +132,14 @@ async function fetchRiderEvents(config: RiderConfig): Promise<SportEvent[]> {
       console.log(`[Cycling/${config.slug}] S1[${i}]: date="${dt}" race="${rn}"`);
     });
     for (const el of strategy1Items) {
-      const dateText = $(el).find('.date').first().text().trim();
+      // Try .date class first; fall back to extracting date from the start of the li text
+      // (PCS changed structure ~March 2026: date is now a leading text node, not a .date span)
+      let dateText = $(el).find('.date').first().text().trim();
+      if (!dateText) {
+        const liText = $(el).text().trim();
+        const m = liText.match(/^(\d{1,2}\.\d{2}(?:\.\d{4})?)/);
+        if (m) dateText = m[1];
+      }
       const raceName = getLinkText($, el);
       const raceUrl = $(el).find('a').first().attr('href');
       if (!dateText || !hasValidRaceName(raceName)) continue;
