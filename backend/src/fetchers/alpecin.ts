@@ -112,8 +112,20 @@ const MVDP_CONFIG: RiderConfig = {
   mtb: 'mvdp_mtb',
 };
 
+// Road race categories that MvdP personally rides.
+// "Europe Tour" and "National" are ridden exclusively by teammates.
+const MVDP_ROAD_CATEGORIES = new Set(['WorldTour', 'ProSeries']);
+
 function buildEvents(apiEvents: AlpecinApiEvent[], config: RiderConfig): SportEvent[] {
-  return apiEvents.map((ev) => {
+  return apiEvents
+    .filter((ev) => {
+      // For road races, skip Europe Tour / National — those are teammates' races.
+      // CX and MTB: keep everything (MvdP rides most of those).
+      const disc = disciplineToCategory(ev.discipline_slug);
+      if (disc === 'road') return MVDP_ROAD_CATEGORIES.has(ev.category);
+      return true;
+    })
+    .map((ev) => {
     const disc = disciplineToCategory(ev.discipline_slug);
     const sport: SportCategory =
       disc === 'cx' ? config.cx : disc === 'mtb' ? config.mtb : config.road;
