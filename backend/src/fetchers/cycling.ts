@@ -128,8 +128,18 @@ async function fetchRiderEvents(config: RiderConfig): Promise<SportEvent[]> {
     const seen = new Set<string>();
     const pcsBase = 'https://www.procyclingstats.com';
 
+    // Diagnostic: sample first 3 li items from candidate UL selectors to detect new structure
+    ['ul.pps.list', 'ul.list.dashed', 'ul[class*="rdr"]', 'ul[class*="fs14"]'].forEach((sel) => {
+      const items = $(sel).first().find('li').slice(0, 3).toArray();
+      if (items.length > 0) {
+        const sample = items.map((el) => $(el).text().trim().replace(/\s+/g, ' ').slice(0, 60)).join(' || ');
+        console.log(`[Cycling/${config.slug}] ${sel}: ${sample}`);
+      }
+    });
+
     // Strategy 1: PCS upcoming section
-    const strategy1Items = $('ul.rdrSeasonList li, .rdrUpcoming li').toArray();
+    // Tries both legacy selectors and new candidates observed in UL class logs.
+    const strategy1Items = $('ul.rdrSeasonList li, .rdrUpcoming li, ul.pps.list li').toArray();
     console.log(`[Cycling/${config.slug}] Strategy 1: found ${strategy1Items.length} li items`);
     // Log first 5 raw items for diagnosis
     strategy1Items.slice(0, 5).forEach((el, i) => {

@@ -35,9 +35,10 @@ router.post('/refresh', async (req, res) => {
     fetchPuckPieterseEvents(),   // PCS for Puck (primary)
   ]);
 
-  // MvdP: PCS primary, Alpecin fallback if PCS fails/empty
+  // MvdP: PCS primary, Alpecin fallback if PCS fails/returns suspiciously few events
+  // Require at least 3 events to guard against scraper returning 1 stale result
   const pcsMvdp = mvdpPcsResult.status === 'fulfilled' ? mvdpPcsResult.value : [];
-  const needsMvdpFallback = pcsMvdp.length === 0;
+  const needsMvdpFallback = pcsMvdp.length < 3;
 
   const [mvdpResult] = await Promise.all([
     needsMvdpFallback
