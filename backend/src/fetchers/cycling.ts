@@ -93,11 +93,12 @@ async function fetchHtml(riderSlug: string): Promise<string> {
   const zenRowsKey = (process.env.ZENROWS_API_KEY ?? '').trim();
 
   if (zenRowsKey) {
-    const { data } = await axios.get<string>('https://api.zenrows.com/v1/', {
+    const resp = await axios.get<string>('https://api.zenrows.com/v1/', {
       params: { apikey: zenRowsKey, url, js_render: 'false' },
       timeout: 20_000,
     });
-    return data;
+    console.log(`[Cycling/${riderSlug}] ZenRows status=${resp.status} html_start="${resp.data.slice(0, 120).replace(/\s+/g, ' ')}"`);
+    return resp.data;
   }
 
   const { data } = await axios.get<string>(url, {
