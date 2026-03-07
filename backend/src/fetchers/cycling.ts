@@ -40,13 +40,8 @@ function parsePCSDate(dateText: string): Date | null {
   if (!match) return null;
   const day = parseInt(match[1], 10);
   const month = parseInt(match[2], 10) - 1;
-  const now = new Date();
-  const year = match[3] ? parseInt(match[3], 10) : now.getFullYear();
-  const date = new Date(Date.UTC(year, month, day, 10, 0, 0));
-  if (!match[3] && date < new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)) {
-    return new Date(Date.UTC(year + 1, month, day, 10, 0, 0));
-  }
-  return date;
+  const year = match[3] ? parseInt(match[3], 10) : new Date().getFullYear();
+  return new Date(Date.UTC(year, month, day, 10, 0, 0));
 }
 
 /**
