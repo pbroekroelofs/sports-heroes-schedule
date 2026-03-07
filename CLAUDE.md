@@ -35,5 +35,22 @@ A personal PWA for friends & family to track sports events (F1, Ajax, AZ, MvdP c
 - **VAPID keys** stored as GitHub Secrets: `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`. Frontend gets `NEXT_PUBLIC_VAPID_PUBLIC_KEY` as build arg.
 - **PWA icons** — `frontend/public/icons/icon-192.png` and `icon-512.png` are referenced in `manifest.json` but still need actual PNG files from the user
 
+## Deployment
+
+**How to deploy**: push to `main` on GitHub. The CI/CD pipeline (`.github/workflows/deploy.yml`) automatically builds and deploys both frontend and backend to Cloud Run.
+
+```bash
+git add <files>
+git commit -m "..."
+git push
+```
+
+No `gcloud` CLI needed. Cloud Run picks up the new image automatically after the GitHub Actions workflow completes (~3-5 min).
+
+After deploying backend changes that affect event fetching, trigger a manual refresh:
+```
+POST /cron/refresh   (header: X-Cron-Secret: <CRON_SECRET>)
+```
+
 ## GitHub Secrets in use
 `GCP_PROJECT_ID`, `GCP_SA_KEY`, `FRONTEND_URL`, `BACKEND_URL`, `ZENROWS_API_KEY`, `CRON_SECRET`, `FIREBASE_SERVICE_ACCOUNT` (GCP secret), `FOOTBALL_DATA_API_KEY` (GCP secret), `NEXT_PUBLIC_FIREBASE_*` (6 keys), `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`

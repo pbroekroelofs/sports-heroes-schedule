@@ -114,7 +114,7 @@ const MVDP_CONFIG: RiderConfig = {
 
 // Road race categories that MvdP personally rides.
 // "Europe Tour" and "National" are ridden exclusively by teammates.
-const MVDP_ROAD_CATEGORIES = new Set(['WorldTour', 'ProSeries']);
+const MVDP_ROAD_CATEGORIES = new Set(['WorldTour']);
 
 function buildEvents(apiEvents: AlpecinApiEvent[], config: RiderConfig): SportEvent[] {
   return apiEvents
