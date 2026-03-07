@@ -116,6 +116,13 @@ async function fetchRiderEvents(config: RiderConfig): Promise<SportEvent[]> {
   try {
     const html = await fetchHtml(config.slug);
     const $ = cheerio.load(html);
+
+    // Page diagnostics — log title + ul/div class names to detect HTML structure changes
+    const pageTitle = $('title').text().trim().slice(0, 80);
+    const ulClasses = [...new Set($('ul[class]').map((_, el) => $(el).attr('class') as string).get())].slice(0, 8).join(' | ');
+    console.log(`[Cycling/${config.slug}] Page title: "${pageTitle}"`);
+    console.log(`[Cycling/${config.slug}] UL classes: ${ulClasses || '(none)'}`);
+
     const events: SportEvent[] = [];
     const now = new Date();
     const seen = new Set<string>();
