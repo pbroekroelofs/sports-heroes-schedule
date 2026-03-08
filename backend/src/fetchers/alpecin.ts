@@ -112,17 +112,29 @@ const MVDP_CONFIG: RiderConfig = {
   mtb: 'mvdp_mtb',
 };
 
-// Road race categories that MvdP personally rides.
-// "Europe Tour" and "National" are ridden exclusively by teammates.
-const MVDP_ROAD_CATEGORIES = new Set(['WorldTour']);
+// Road races that MvdP personally rides in 2026.
+// Source: sporza.be / wielerflits.nl programme announcement.
+// Update each season when the new programme is announced.
+const MVDP_ROAD_WHITELIST = new Set([
+  'Omloop Het Nieuwsblad',
+  'Strade Bianche',
+  'Paris-Nice',
+  'Tirreno-Adriatico',
+  'Milano-Sanremo',
+  'E3 Saxo Classic',
+  'Dwars door Vlaanderen',
+  'In Flanders Fields',
+  'Ronde van Vlaanderen',
+  'Paris-Roubaix',
+]);
 
 function buildEvents(apiEvents: AlpecinApiEvent[], config: RiderConfig): SportEvent[] {
   return apiEvents
     .filter((ev) => {
-      // For road races, skip Europe Tour / National — those are teammates' races.
-      // CX and MTB: keep everything (MvdP rides most of those).
+      // For road races, only include races MvdP personally rides (whitelist).
+      // CX and MTB: keep everything (discipline_slug is reliable for those).
       const disc = disciplineToCategory(ev.discipline_slug);
-      if (disc === 'road') return MVDP_ROAD_CATEGORIES.has(ev.category);
+      if (disc === 'road') return MVDP_ROAD_WHITELIST.has(ev.name.trim());
       return true;
     })
     .map((ev) => {
